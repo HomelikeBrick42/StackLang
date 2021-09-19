@@ -1,0 +1,18 @@
+0
+if
+    1
+    if
+        5
+    else
+        6
+    end
+    .
+else
+    0
+    if
+        8
+    else
+        9
+    end
+    .
+end
