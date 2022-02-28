@@ -283,6 +283,10 @@ CompileOps :: proc(filepath, source: string) -> (
 			ExpectTypes(&type_stack, token.location, {IntegerType{}, IntegerType{}}) or_return
 			append(&ops, Op{location = token.location, data = IntegerDivideOp{}})
 			append(&type_stack, IntegerType{})
+		case .Modulus:
+			ExpectTypes(&type_stack, token.location, {IntegerType{}, IntegerType{}}) or_return
+			append(&ops, Op{location = token.location, data = IntegerModulusOp{}})
+			append(&type_stack, IntegerType{})
 		case .Equal:
 			ExpectTypeCount(&type_stack, token.location, 2) or_return
 			type := pop(&type_stack)

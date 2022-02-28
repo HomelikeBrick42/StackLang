@@ -19,9 +19,13 @@ Main :: proc() -> Maybe(CompileError) {
 	} else {
 		filepath := "test.stack"
 		source := `
-			1 while dup 10 <= {
+			1 while dup 100 <= {
 				dup print
-				1 +
+				if dup 2 % 0 == {
+					1 +
+				} else {
+					2 *
+				}
 			} drop
 		`
 	}
@@ -85,6 +89,8 @@ main :: proc() {
 				io.write_string(fi.writer, "*")
 			case .Divide:
 				io.write_string(fi.writer, "/")
+			case .Modulus:
+				io.write_string(fi.writer, "%")
 			case .Equal:
 				io.write_string(fi.writer, "==")
 			case .NotEqual:

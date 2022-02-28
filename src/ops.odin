@@ -15,6 +15,7 @@ Op :: struct {
 		IntegerSubtractOp,
 		IntegerMultiplyOp,
 		IntegerDivideOp,
+		IntegerModulusOp,
 		IntegerLessThanOp,
 		IntegerGreaterThanOp,
 		IntegerEqualOp,
@@ -48,6 +49,7 @@ IntegerAddOp :: struct {}
 IntegerSubtractOp :: struct {}
 IntegerMultiplyOp :: struct {}
 IntegerDivideOp :: struct {}
+IntegerModulusOp :: struct {}
 IntegerLessThanOp :: struct {}
 IntegerGreaterThanOp :: struct {}
 IntegerEqualOp :: struct {}

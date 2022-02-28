@@ -47,6 +47,10 @@ ExecuteOps :: proc(ops: []Op) -> []Value {
 			b := pop(&stack).(i64)
 			a := pop(&stack).(i64)
 			append(&stack, a / b)
+		case IntegerModulusOp:
+			b := pop(&stack).(i64)
+			a := pop(&stack).(i64)
+			append(&stack, a % b)
 		case IntegerLessThanOp:
 			b := pop(&stack).(i64)
 			a := pop(&stack).(i64)

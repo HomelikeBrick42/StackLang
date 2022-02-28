@@ -19,6 +19,7 @@ TokenKind :: enum {
 	Subtract,
 	Multiply,
 	Divide,
+	Modulus,
 	Equal,
 	NotEqual,
 	LessThan,

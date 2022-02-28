@@ -17,6 +17,7 @@ lexer_keywords := map[string]TokenKind {
 	"-"     = .Subtract,
 	"*"     = .Multiply,
 	"/"     = .Divide,
+	"%"     = .Modulus,
 	"=="    = .Equal,
 	"!="    = .NotEqual,
 	"<"     = .LessThan,
