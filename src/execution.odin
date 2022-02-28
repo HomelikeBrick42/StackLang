@@ -47,6 +47,14 @@ ExecuteOps :: proc(ops: []Op) -> []Value {
 			b := pop(&stack).(i64)
 			a := pop(&stack).(i64)
 			append(&stack, a / b)
+		case IntegerLessThanOp:
+			b := pop(&stack).(i64)
+			a := pop(&stack).(i64)
+			append(&stack, a < b)
+		case IntegerGreaterThanOp:
+			b := pop(&stack).(i64)
+			a := pop(&stack).(i64)
+			append(&stack, a > b)
 		case IntegerEqualOp:
 			b := pop(&stack).(i64)
 			a := pop(&stack).(i64)
@@ -60,6 +68,9 @@ ExecuteOps :: proc(ops: []Op) -> []Value {
 		case BoolDupOp:
 			value := pop(&stack).(bool)
 			append(&stack, value, value)
+		case BoolNotOp:
+			value := pop(&stack).(bool)
+			append(&stack, !value)
 		case BoolEqualOp:
 			b := pop(&stack).(bool)
 			a := pop(&stack).(bool)

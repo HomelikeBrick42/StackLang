@@ -15,6 +15,8 @@ Op :: struct {
 		IntegerSubtractOp,
 		IntegerMultiplyOp,
 		IntegerDivideOp,
+		IntegerLessThanOp,
+		IntegerGreaterThanOp,
 		IntegerEqualOp,
 		IntegerPrintOp,
 
@@ -22,6 +24,7 @@ Op :: struct {
 		BoolPushOp,
 		BoolDropOp,
 		BoolDupOp,
+		BoolNotOp,
 		BoolEqualOp,
 		BoolPrintOp,
 	},
@@ -45,6 +48,8 @@ IntegerAddOp :: struct {}
 IntegerSubtractOp :: struct {}
 IntegerMultiplyOp :: struct {}
 IntegerDivideOp :: struct {}
+IntegerLessThanOp :: struct {}
+IntegerGreaterThanOp :: struct {}
 IntegerEqualOp :: struct {}
 IntegerPrintOp :: struct {}
 
@@ -54,5 +59,6 @@ BoolPushOp :: struct {
 }
 BoolDropOp :: struct {}
 BoolDupOp :: struct {}
+BoolNotOp :: struct {}
 BoolEqualOp :: struct {}
 BoolPrintOp :: struct {}

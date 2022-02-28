@@ -7,6 +7,8 @@ Scope :: union {
 	IfConditionScope,
 	IfScope,
 	ElseScope,
+	WhileConditionScope,
+	WhileScope,
 }
 
 @(private = "file")
@@ -28,6 +30,20 @@ ElseScope :: struct {
 	jump_past_if_ip: int,
 	if_scope:        IfScope,
 	stack_after_if:  []Type,
+}
+
+@(private = "file")
+WhileConditionScope :: struct {
+	location: SourceLocation,
+	ip:       int,
+}
+
+@(private = "file")
+WhileScope :: struct {
+	location:        SourceLocation,
+	jump_false_ip:   int,
+	condition_scope: WhileConditionScope,
+	stack_before:    []Type,
 }
 
 CompileOps :: proc(filepath, source: string) -> (
@@ -75,25 +91,57 @@ CompileOps :: proc(filepath, source: string) -> (
 		case .CloseParenthesis:
 			unimplemented()
 		case .OpenBrace:
-			if _, ok := scopes[len(scopes) - 1].(IfConditionScope); ok {
-				condition_scope := pop(&scopes).(IfConditionScope)
-				ExpectTypes(&type_stack, token.location, {BoolType{}}) or_return
+			not_handled := false
+			if len(scopes) > 0 {
+				scope := scopes[len(scopes) - 1]
+				#partial switch _ in scope {
+				case IfConditionScope:
+					condition_scope := pop(&scopes).(IfConditionScope)
+					ExpectTypes(&type_stack, token.location, {BoolType{}}) or_return
 
-				stack_copy := make([]Type, len(type_stack))
-				copy(stack_copy, type_stack[:])
+					stack_copy := make([]Type, len(type_stack))
+					copy(stack_copy, type_stack[:])
 
-				append(
-					&scopes,
-					IfScope{
-						location = token.location,
-						jump_false_ip = len(ops),
-						condition_scope = condition_scope,
-						stack_before = stack_copy,
-					},
-				)
-				append(&ops, Op{location = token.location, data = JumpFalseOp{}})
+					append(
+						&scopes,
+						IfScope{
+							location = token.location,
+							jump_false_ip = len(ops),
+							condition_scope = condition_scope,
+							stack_before = stack_copy,
+						},
+					)
+					append(&ops, Op{location = token.location, data = JumpFalseOp{}})
+				case WhileConditionScope:
+					condition_scope := pop(&scopes).(WhileConditionScope)
+					ExpectTypes(&type_stack, token.location, {BoolType{}}) or_return
+
+					stack_copy := make([]Type, len(type_stack))
+					copy(stack_copy, type_stack[:])
+
+					append(
+						&scopes,
+						WhileScope{
+							location = token.location,
+							jump_false_ip = len(ops),
+							condition_scope = condition_scope,
+							stack_before = stack_copy,
+						},
+					)
+					append(&ops, Op{location = token.location, data = JumpFalseOp{}})
+				case:
+					not_handled = true
+				}
 			} else {
-				unimplemented()
+				not_handled = true
+			}
+
+			if not_handled {
+				error = CompileError {
+					location = token.location,
+					message  = fmt.aprintf("Unexpected {{"),
+				}
+				return
 			}
 		case .CloseBrace:
 			scope := pop(&scopes)
@@ -179,8 +227,45 @@ CompileOps :: proc(filepath, source: string) -> (
 
 				delete(scope.if_scope.stack_before)
 				delete(scope.stack_after_if)
+			case WhileScope:
+				append(
+					&ops,
+					Op{
+						location = token.location,
+						data = JumpOp{relative_ip = scope.condition_scope.ip - len(ops)},
+					},
+				)
+
+				jump_false_op := &ops[scope.jump_false_ip].data.(JumpFalseOp)
+				jump_false_op.relative_ip = len(ops) - scope.jump_false_ip
+
+				if len(scope.stack_before) != len(type_stack) {
+					error = CompileError {
+						location = token.location,
+						message  = fmt.aprintf("While cannot change the number of elements on the stack"),
+					}
+					return
+				}
+
+				for _, i in scope.stack_before {
+					if !TypesEqual(scope.stack_before[i], type_stack[i]) {
+						error = CompileError {
+							location = token.location,
+							message  = fmt.aprintf(
+								"While cannot change the types of the elements on the stack",
+							),
+						}
+						return
+					}
+				}
+
+				delete(scope.stack_before)
 			case:
-				unimplemented()
+				error = CompileError {
+					location = token.location,
+					message  = fmt.aprintf("Unexpected }}"),
+				}
+				return
 			}
 		case .Add:
 			ExpectTypes(&type_stack, token.location, {IntegerType{}, IntegerType{}}) or_return
@@ -215,6 +300,47 @@ CompileOps :: proc(filepath, source: string) -> (
 				return
 			}
 			append(&type_stack, BoolType{})
+		case .NotEqual:
+			ExpectTypeCount(&type_stack, token.location, 2) or_return
+			type := pop(&type_stack)
+			if integer_type, ok := type.(IntegerType); ok {
+				ExpectTypes(&type_stack, token.location, {IntegerType{}}) or_return
+				append(&ops, Op{location = token.location, data = IntegerEqualOp{}})
+				append(&ops, Op{location = token.location, data = BoolNotOp{}})
+			} else if bool_type, ok := type.(BoolType); ok {
+				ExpectTypes(&type_stack, token.location, {BoolType{}}) or_return
+				append(&ops, Op{location = token.location, data = BoolEqualOp{}})
+				append(&ops, Op{location = token.location, data = BoolNotOp{}})
+			} else {
+				error = CompileError {
+					location = token.location,
+					message  = fmt.aprintf("== cannot compare %v", type),
+				}
+				return
+			}
+			append(&type_stack, BoolType{})
+		case .LessThan:
+			ExpectTypes(&type_stack, token.location, {IntegerType{}, IntegerType{}}) or_return
+			append(&ops, Op{location = token.location, data = IntegerLessThanOp{}})
+			append(&type_stack, BoolType{})
+		case .GreaterThan:
+			ExpectTypes(&type_stack, token.location, {IntegerType{}, IntegerType{}}) or_return
+			append(&ops, Op{location = token.location, data = IntegerGreaterThanOp{}})
+			append(&type_stack, BoolType{})
+		case .LessThanEqual:
+			ExpectTypes(&type_stack, token.location, {IntegerType{}, IntegerType{}}) or_return
+			append(&ops, Op{location = token.location, data = IntegerGreaterThanOp{}})
+			append(&ops, Op{location = token.location, data = BoolNotOp{}})
+			append(&type_stack, BoolType{})
+		case .GreaterThanEqual:
+			ExpectTypes(&type_stack, token.location, {IntegerType{}, IntegerType{}}) or_return
+			append(&ops, Op{location = token.location, data = IntegerLessThanOp{}})
+			append(&ops, Op{location = token.location, data = BoolNotOp{}})
+			append(&type_stack, BoolType{})
+		case .Not:
+			ExpectTypes(&type_stack, token.location, {BoolType{}, BoolType{}}) or_return
+			append(&ops, Op{location = token.location, data = BoolNotOp{}})
+			append(&type_stack, BoolType{})
 		case .Assign:
 			unimplemented()
 		case .Print:
@@ -239,6 +365,8 @@ CompileOps :: proc(filepath, source: string) -> (
 				message  = fmt.aprintf("else is not connected to an if"),
 			}
 			return
+		case .While:
+			append(&scopes, WhileConditionScope{location = token.location, ip = len(ops)})
 		case .Drop:
 			ExpectTypeCount(&type_stack, token.location, 1) or_return
 			type := pop(&type_stack)

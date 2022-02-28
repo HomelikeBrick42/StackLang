@@ -6,15 +6,25 @@ import "core:io"
 import "core:os"
 
 Main :: proc() -> Maybe(CompileError) {
-	filepath := "test.stack"
-	source := `
-		1 2 3 * +
-		if dup 7 == {
-			drop
-			10
-		}
-		print
-	`
+	when false {
+		filepath := "test.stack"
+		source := `
+			1 2 3 * +
+			if dup 7 == {
+				drop
+				10
+			}
+			print
+		`
+	} else {
+		filepath := "test.stack"
+		source := `
+			1 while dup 10 <= {
+				dup print
+				1 +
+			} drop
+		`
+	}
 	ops, err := CompileOps(filepath, source)
 	defer delete(ops)
 	err or_return
@@ -77,6 +87,18 @@ main :: proc() {
 				io.write_string(fi.writer, "/")
 			case .Equal:
 				io.write_string(fi.writer, "==")
+			case .NotEqual:
+				io.write_string(fi.writer, "!=")
+			case .LessThan:
+				io.write_string(fi.writer, "<")
+			case .GreaterThan:
+				io.write_string(fi.writer, ">")
+			case .LessThanEqual:
+				io.write_string(fi.writer, "<=")
+			case .GreaterThanEqual:
+				io.write_string(fi.writer, ">=")
+			case .Not:
+				io.write_string(fi.writer, "!")
 			case .Assign:
 				io.write_string(fi.writer, "=")
 			case .Print:
@@ -85,6 +107,8 @@ main :: proc() {
 				io.write_string(fi.writer, "if")
 			case .Else:
 				io.write_string(fi.writer, "else")
+			case .While:
+				io.write_string(fi.writer, "while")
 			case .Drop:
 				io.write_string(fi.writer, "drop")
 			case .Dup:
