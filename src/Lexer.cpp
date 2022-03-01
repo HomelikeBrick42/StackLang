@@ -93,6 +93,11 @@ Token Lexer::NextToken() {
     }
 }
 
+Token Lexer::PeekToken() {
+    auto copy = *this;
+    return copy.NextToken();
+}
+
 char Lexer::CurrentChar() {
     if (Location.Position < Source.length()) {
         return Source[Location.Position];

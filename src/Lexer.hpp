@@ -15,6 +15,7 @@ private:
 public:
     Lexer(std::string_view filepath, std::string_view source);
     Token NextToken();
+    Token PeekToken();
 private:
     char CurrentChar();
     char NextChar();
