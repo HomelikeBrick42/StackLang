@@ -2,6 +2,7 @@
 #include "Lexer.hpp"
 #include "Ops.hpp"
 #include "Compilation.hpp"
+#include "Execution.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -52,6 +53,8 @@ int main(int, char** argv) {
 #endif
 
     auto ops = CompileOps(filepath, source);
+
+#if 0
     for (size_t i = 0; i < ops.size(); i++) {
         auto& op    = ops[i];
         auto string = OpKind_ToString(op.Kind);
@@ -63,6 +66,11 @@ int main(int, char** argv) {
         }
         fputc('\n', stdout);
     }
+    fputc('\n', stdout);
+    fputc('\n', stdout);
+#endif
+
+    ExecuteOps(ops);
 
     return 0;
 }
