@@ -10,14 +10,6 @@ C:/Dev/C++/StackLang/src/Common.hpp
 string_view
 -
 
-C:/Dev/C++/StackLang/src/Lexer.cpp
-Lexer.hpp
-C:/Dev/C++/StackLang/src/Lexer.hpp
-string
--
-stdexcept
--
-
 C:/Dev/C++/StackLang/src/Lexer.hpp
 Common.hpp
 C:/Dev/C++/StackLang/src/Common.hpp
@@ -49,10 +41,8 @@ cassert
 -
 cstdint
 -
-
-C:/Dev/C++/StackLang/src/Token.cpp
-Token.hpp
-C:/Dev/C++/StackLang/src/Token.hpp
+vector
+-
 
 C:/Dev/C++/StackLang/src/Token.hpp
 Common.hpp

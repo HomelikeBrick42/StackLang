@@ -1,3 +1,6 @@
+1 2 3 * + print
+
+/*
 0 while dup 100 <= {
     dup print
     if dup 2 % == 0 {
@@ -6,3 +9,4 @@
         2 *
     }
 } drop
+*/

@@ -33,6 +33,7 @@ Lexer::Lexer(std::string_view filepath, std::string_view source)
     : Location{ .Filepath = filepath, .Position = 0, .Line = 1, .Column = 1 }, Source{ source } {}
 
 Token Lexer::NextToken() {
+    Start:
     SkipWhitespace();
     SourceLocation startLocation = Location;
     if (CurrentChar() == '\0') {
@@ -74,6 +75,13 @@ Token Lexer::NextToken() {
                     .Location = startLocation,
                     .Length   = length,
                 };
+            } else if (name == "/*") {
+                while (true) {
+                    Token token = NextToken();
+                    if (token.Kind == TokenKind::EndOfFile || Source.substr(token.Location.Position, token.Length) == "*/") {
+                        goto Start;
+                    }
+                }
             } else {
                 return {
                     .Kind     = TokenKind::Name,

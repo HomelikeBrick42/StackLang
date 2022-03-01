@@ -1,5 +1,7 @@
 #include "Token.hpp"
 
+#include <cassert>
+
 std::string_view TokenKind_ToString(TokenKind kind) {
     switch (kind) {
         case TokenKind::Invalid:
@@ -51,5 +53,6 @@ std::string_view TokenKind_ToString(TokenKind kind) {
         case TokenKind::Drop:
             return "drop";
     }
+    assert(false);
     std::exit(-1);
 }
