@@ -1,3 +1,0 @@
-C:/Dev/C++/StackLang/cmake-build-debug/CMakeFiles/StackLang.dir
-C:/Dev/C++/StackLang/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Dev/C++/StackLang/cmake-build-debug/CMakeFiles/rebuild_cache.dir
