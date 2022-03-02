@@ -16,6 +16,10 @@ std::string_view TokenKind_ToString(TokenKind kind) {
             return "{";
         case TokenKind::CloseBrace:
             return "}";
+        case TokenKind::OpenParenthesis:
+            return "(";
+        case TokenKind::CloseParenthesis:
+            return ")";
         case TokenKind::Add:
             return "+";
         case TokenKind::Subtract:
@@ -52,6 +56,8 @@ std::string_view TokenKind_ToString(TokenKind kind) {
             return "dup";
         case TokenKind::Drop:
             return "drop";
+        case TokenKind::Const:
+            return "const";
     }
     assert(false);
     std::exit(-1);

@@ -1,4 +1,6 @@
-0 while dup 100 <= {
+const limit(49 1 + 2 *)
+
+0 while dup limit <= {
     dup print
     if dup 2 % 0 == {
         1 +

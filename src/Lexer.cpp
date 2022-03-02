@@ -6,6 +6,8 @@
 const std::unordered_map<char, TokenKind> Lexer::Separators{
     { '{', TokenKind::OpenBrace },
     { '}', TokenKind::CloseBrace },
+    { '(', TokenKind::OpenParenthesis },
+    { ')', TokenKind::CloseParenthesis },
 };
 
 const std::unordered_map<std::string_view, TokenKind> Lexer::Keywords{
@@ -27,13 +29,14 @@ const std::unordered_map<std::string_view, TokenKind> Lexer::Keywords{
     { "while", TokenKind::While },
     { "dup", TokenKind::Dup },
     { "drop", TokenKind::Drop },
+    { "const", TokenKind::Const },
 };
 
 Lexer::Lexer(std::string_view filepath, std::string_view source)
     : Location{ .Filepath = filepath, .Position = 0, .Line = 1, .Column = 1 }, Source{ source } {}
 
 Token Lexer::NextToken() {
-    Start:
+Start:
     SkipWhitespace();
     SourceLocation startLocation = Location;
     if (CurrentChar() == '\0') {
@@ -87,6 +90,7 @@ Token Lexer::NextToken() {
                     .Kind     = TokenKind::Name,
                     .Location = startLocation,
                     .Length   = length,
+                    .Data     = name,
                 };
             }
         }

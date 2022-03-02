@@ -2,11 +2,13 @@
 
 #include "Lexer.hpp"
 #include "Types.hpp"
+#include "Execution.hpp"
 
 #include <span>
 #include <cassert>
 #include <algorithm>
 #include <iterator>
+#include <unordered_map>
 
 using TypeData = std::pair<Type, SourceLocation>;
 
@@ -18,33 +20,41 @@ enum struct ScopeKind {
     Else,
     WhileCondition,
     While,
+    Const,
 };
 
 struct IfScopeData {
-    size_t ConditionalJumpIp;
-    std::vector<Type> StackBeforeIf;
+    size_t ConditionalJumpIp{};
+    std::vector<Type> StackBeforeIf{};
 };
 
 struct ElseScopeData {
-    size_t EndIfJumpIp;
-    std::vector<Type> StackBeforeElse;
+    size_t EndIfJumpIp{};
+    std::vector<Type> StackBeforeElse{};
 };
 
 struct WhileConditionScopeData {
-    size_t JumpToIp;
-    std::vector<Type> StackBeforeWhile;
+    size_t JumpToIp{};
+    std::vector<Type> StackBeforeWhile{};
 };
 
 struct WhileScopeData {
-    size_t JumpToIp;
-    std::vector<Type> StackBeforeWhile;
-    size_t ConditionalJumpIp;
+    size_t JumpToIp{};
+    std::vector<Type> StackBeforeWhile{};
+    size_t ConditionalJumpIp{};
+};
+
+struct ConstScopeData {
+    std::vector<Op> OldOps{};
+    std::vector<TypeData> OldTypeStack{};
+    std::string_view Name{};
 };
 
 struct Scope {
     ScopeKind Kind = ScopeKind::Invalid;
-    SourceLocation Location;
-    std::variant<std::monostate, IfScopeData, ElseScopeData, WhileConditionScopeData, WhileScopeData> Data{};
+    SourceLocation Location{};
+    std::unordered_map<std::string_view, std::vector<std::pair<Type, Op>>> Constants{};
+    std::variant<std::monostate, IfScopeData, ElseScopeData, WhileConditionScopeData, WhileScopeData, ConstScopeData> Data{};
 };
 
 std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
@@ -150,6 +160,10 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                         case ScopeKind::While: {
                             fprintf(stderr, "Expected a closing } for the while body before the end of the file\n");
                         } break;
+
+                        case ScopeKind::Const: {
+                            fprintf(stderr, "Expected a closing ) for the const value before the end of the file\n");
+                        } break;
                     }
                     fprintf(stderr,
                             "%.*s:%llu:%llu: The scope was opened here\n",
@@ -183,14 +197,30 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
             case TokenKind::Name: {
                 auto name = std::get<std::string_view>(token.Data);
 
-                fflush(stdout);
-                fprintf(stderr,
-                        "%.*s:%llu:%llu: Unable to find name %.*s\n",
-                        STR_FORMAT(token.Location.Filepath),
-                        token.Location.Line,
-                        token.Location.Column,
-                        STR_FORMAT(name));
-                std::exit(1);
+                bool found = false;
+                for (auto it = scopes.rbegin(); it != scopes.rend(); it++) {
+                    auto& scope = *it;
+                    if (scope.Constants.contains(name)) {
+                        auto& data = scope.Constants[name];
+                        for (auto& [type, op] : data) {
+                            ops.push_back(op);
+                            typeStack.push_back({type,token.Location});
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    fflush(stdout);
+                    fprintf(stderr,
+                            "%.*s:%llu:%llu: Unable to find name %.*s\n",
+                            STR_FORMAT(token.Location.Filepath),
+                            token.Location.Line,
+                            token.Location.Column,
+                            STR_FORMAT(name));
+                    std::exit(1);
+                }
             } break;
 
             case TokenKind::Integer: {
@@ -350,6 +380,54 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                     fflush(stdout);
                     fprintf(stderr,
                             "%.*s:%llu:%llu: Unexpected }\n",
+                            STR_FORMAT(token.Location.Filepath),
+                            token.Location.Line,
+                            token.Location.Column);
+                    std::exit(1);
+                }
+            } break;
+
+            case TokenKind::OpenParenthesis: {
+                fflush(stdout);
+                fprintf(stderr,
+                        "%.*s:%llu:%llu: Unexpected (\n",
+                        STR_FORMAT(token.Location.Filepath),
+                        token.Location.Line,
+                        token.Location.Column);
+                std::exit(1);
+            } break;
+
+            case TokenKind::CloseParenthesis: {
+                if (std::holds_alternative<ConstScopeData>(scopes.back().Data)) {
+                    auto scope = std::move(scopes.back());
+                    scopes.pop_back();
+                    auto& data = std::get<ConstScopeData>(scope.Data);
+                    ops.push_back({ .Kind = OpKind::Exit });
+                    auto values = ExecuteOps(ops);
+                    std::vector<std::pair<Type, Op>> constantData;
+                    for (size_t i = 0; i < values.size(); i++) {
+                        Op op;
+                        if (std::holds_alternative<long long>(values[i])) {
+                            op = {
+                                .Kind = OpKind::IntegerPush,
+                                .Data = std::get<long long>(values[i]),
+                            };
+                        } else if (std::holds_alternative<bool>(values[i])) {
+                            op = {
+                                .Kind = OpKind::BoolPush,
+                                .Data = std::get<bool>(values[i]),
+                            };
+                        }
+                        constantData.push_back({ typeStack[i].first, op });
+                    }
+                    ops       = std::move(data.OldOps);
+                    typeStack = std::move(data.OldTypeStack);
+
+                    scopes.back().Constants[data.Name] = constantData;
+                } else {
+                    fflush(stdout);
+                    fprintf(stderr,
+                            "%.*s:%llu:%llu: Unexpected )\n",
                             STR_FORMAT(token.Location.Filepath),
                             token.Location.Line,
                             token.Location.Column);
@@ -610,6 +688,47 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                         std::exit(1);
                     } break;
                 }
+            } break;
+
+            case TokenKind::Const: {
+                auto constToken = token;
+                token           = lexer.NextToken();
+                if (token.Kind != TokenKind::Name) {
+                    auto string = TokenKind_ToString(token.Kind);
+                    fflush(stdout);
+                    fprintf(stderr,
+                            "%.*s:%llu:%llu: Expected a name for the const, but got %.*s\n",
+                            STR_FORMAT(token.Location.Filepath),
+                            token.Location.Line,
+                            token.Location.Column,
+                            STR_FORMAT(string));
+                    std::exit(1);
+                }
+                auto name = std::get<std::string_view>(token.Data);
+                token     = lexer.NextToken();
+                if (token.Kind != TokenKind::OpenParenthesis) {
+                    auto string = TokenKind_ToString(token.Kind);
+                    fflush(stdout);
+                    fprintf(stderr,
+                            "%.*s:%llu:%llu: Expected a ( for the const value, but got %.*s\n",
+                            STR_FORMAT(token.Location.Filepath),
+                            token.Location.Line,
+                            token.Location.Column,
+                            STR_FORMAT(string));
+                    std::exit(1);
+                }
+                scopes.push_back({
+                    .Kind     = ScopeKind::Const,
+                    .Location = constToken.Location,
+                    .Data =
+                        ConstScopeData{
+                            .OldOps       = std::move(ops),
+                            .OldTypeStack = std::move(typeStack),
+                            .Name         = name,
+                        },
+                });
+                ops       = {};
+                typeStack = {};
             } break;
         }
     }

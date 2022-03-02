@@ -11,6 +11,8 @@ enum struct TokenKind {
     Integer,
     OpenBrace,
     CloseBrace,
+    OpenParenthesis,
+    CloseParenthesis,
     Add,
     Subtract,
     Multiply,
@@ -29,6 +31,7 @@ enum struct TokenKind {
     While,
     Dup,
     Drop,
+    Const,
 };
 
 std::string_view TokenKind_ToString(TokenKind kind);
