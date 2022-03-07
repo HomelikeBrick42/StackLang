@@ -46,6 +46,14 @@ std::string_view TokenKind_ToString(TokenKind kind) {
             return "!";
         case TokenKind::Print:
             return "print";
+        case TokenKind::Pointer:
+            return "@";
+        case TokenKind::Dereference:
+            return "^";
+        case TokenKind::AssignLeft:
+            return "<-";
+        case TokenKind::AssignRight:
+            return "->";
         case TokenKind::If:
             return "if";
         case TokenKind::Else:

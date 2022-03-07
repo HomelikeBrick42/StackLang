@@ -4,10 +4,8 @@
 #include <stdexcept>
 
 const std::unordered_map<char, TokenKind> Lexer::Separators{
-    { '{', TokenKind::OpenBrace },
-    { '}', TokenKind::CloseBrace },
-    { '(', TokenKind::OpenParenthesis },
-    { ')', TokenKind::CloseParenthesis },
+    { '{', TokenKind::OpenBrace },        { '}', TokenKind::CloseBrace }, { '(', TokenKind::OpenParenthesis },
+    { ')', TokenKind::CloseParenthesis }, { '@', TokenKind::Pointer },    { '^', TokenKind::Dereference },
 };
 
 const std::unordered_map<std::string_view, TokenKind> Lexer::Keywords{
@@ -24,6 +22,8 @@ const std::unordered_map<std::string_view, TokenKind> Lexer::Keywords{
     { ">=", TokenKind::GreaterThanOrEqual },
     { "!", TokenKind::Not },
     { "print", TokenKind::Print },
+    { "<-", TokenKind::AssignLeft },
+    { "->", TokenKind::AssignRight },
     { "if", TokenKind::If },
     { "else", TokenKind::Else },
     { "while", TokenKind::While },

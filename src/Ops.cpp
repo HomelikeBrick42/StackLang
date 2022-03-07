@@ -48,6 +48,18 @@ std::string_view OpKind_ToString(OpKind kind) {
             return "BoolEqual";
         case OpKind::BoolPrint:
             return "BoolPrint";
+        case OpKind::TypePush:
+            return "TypePush";
+        case OpKind::TypeDup:
+            return "TypeDup";
+        case OpKind::TypeDrop:
+            return "TypeDrop";
+        case OpKind::TypePointerTo:
+            return "TypePointerTo";
+        case OpKind::TypeEqual:
+            return "TypeEqual";
+        case OpKind::TypePrint:
+            return "TypePrint";
     }
     assert(false);
     std::exit(-1);

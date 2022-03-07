@@ -61,6 +61,33 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
     std::vector<Op> ops{};
     std::vector<TypeData> typeStack{};
     std::vector<Scope> scopes{ { .Kind = ScopeKind::Scope } };
+    scopes.back().Constants.insert({
+        "typeid",
+        {
+            {
+                TypeKind::Type,
+                { .Kind = OpKind::TypePush, .Data = TypeKind::Type },
+            },
+        },
+    });
+    scopes.back().Constants.insert({
+        "int",
+        {
+            {
+                TypeKind::Type,
+                { .Kind = OpKind::TypePush, .Data = TypeKind::Integer },
+            },
+        },
+    });
+    scopes.back().Constants.insert({
+        "bool",
+        {
+            {
+                TypeKind::Type,
+                { .Kind = OpKind::TypePush, .Data = TypeKind::Bool },
+            },
+        },
+    });
 
     auto expectTypeCount = [&](size_t count, const SourceLocation& location) {
         if (typeStack.size() < count) {
@@ -204,7 +231,7 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                         auto& data = scope.Constants[name];
                         for (auto& [type, op] : data) {
                             ops.push_back(op);
-                            typeStack.push_back({type,token.Location});
+                            typeStack.push_back({ type, token.Location });
                         }
                         found = true;
                         break;
@@ -226,7 +253,7 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
             case TokenKind::Integer: {
                 auto value = std::get<long long>(token.Data);
                 ops.push_back({ .Kind = OpKind::IntegerPush, .Data = value });
-                typeStack.push_back({ Type::Integer, token.Location });
+                typeStack.push_back({ TypeKind::Integer, token.Location });
             } break;
 
             case TokenKind::OpenBrace: {
@@ -234,7 +261,7 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                 switch (topScope.Kind) {
                     case ScopeKind::IfCondition: {
                         scopes.pop_back();
-                        expectTypesLiteral({ Type::Bool }, token.Location);
+                        expectTypesLiteral({ TypeKind::Bool }, token.Location);
                         typeStack.pop_back();
                         std::vector<Type> newStack{};
                         std::transform(typeStack.begin(), typeStack.end(), std::back_inserter(newStack), [](const auto& element) {
@@ -256,7 +283,7 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                     case ScopeKind::WhileCondition: {
                         auto condition = std::move(std::get<WhileConditionScopeData>(topScope.Data));
                         scopes.pop_back();
-                        expectTypesLiteral({ Type::Bool }, token.Location);
+                        expectTypesLiteral({ TypeKind::Bool }, token.Location);
                         typeStack.pop_back();
                         scopes.push_back({
                             .Kind     = ScopeKind::While,
@@ -417,6 +444,14 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                                 .Kind = OpKind::BoolPush,
                                 .Data = std::get<bool>(values[i]),
                             };
+                        } else if (std::holds_alternative<Type>(values[i])) {
+                            op = {
+                                .Kind = OpKind::TypePush,
+                                .Data = std::get<Type>(values[i]),
+                            };
+                        } else {
+                            assert(false);
+                            std::exit(-1);
                         }
                         constantData.push_back({ typeStack[i].first, op });
                     }
@@ -436,43 +471,43 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
             } break;
 
             case TokenKind::Add: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerAdd });
-                typeStack.push_back({ Type::Integer, token.Location });
+                typeStack.push_back({ TypeKind::Integer, token.Location });
             } break;
 
             case TokenKind::Subtract: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerSubtract });
-                typeStack.push_back({ Type::Integer, token.Location });
+                typeStack.push_back({ TypeKind::Integer, token.Location });
             } break;
 
             case TokenKind::Multiply: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerMultiply });
-                typeStack.push_back({ Type::Integer, token.Location });
+                typeStack.push_back({ TypeKind::Integer, token.Location });
             } break;
 
             case TokenKind::Divide: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerDivide });
-                typeStack.push_back({ Type::Integer, token.Location });
+                typeStack.push_back({ TypeKind::Integer, token.Location });
             } break;
 
             case TokenKind::Modulus: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerModulus });
-                typeStack.push_back({ Type::Integer, token.Location });
+                typeStack.push_back({ TypeKind::Integer, token.Location });
             } break;
 
             case TokenKind::Equal: {
@@ -481,12 +516,12 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                 expectTypesLiteral({ type, type }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
-                switch (type) {
-                    case Type::Integer: {
+                switch (type.Kind) {
+                    case TypeKind::Integer: {
                         ops.push_back({ .Kind = OpKind::IntegerEqual });
                     } break;
 
-                    case Type::Bool: {
+                    case TypeKind::Bool: {
                         ops.push_back({ .Kind = OpKind::BoolEqual });
                     } break;
 
@@ -502,7 +537,7 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                         std::exit(1);
                     } break;
                 }
-                typeStack.push_back({ Type::Bool, token.Location });
+                typeStack.push_back({ TypeKind::Bool, token.Location });
             } break;
 
             case TokenKind::NotEqual: {
@@ -511,13 +546,13 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                 expectTypesLiteral({ type, type }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
-                switch (type) {
-                    case Type::Integer: {
+                switch (type.Kind) {
+                    case TypeKind::Integer: {
                         ops.push_back({ .Kind = OpKind::IntegerEqual });
                         ops.push_back({ .Kind = OpKind::BoolNot });
                     } break;
 
-                    case Type::Bool: {
+                    case TypeKind::Bool: {
                         ops.push_back({ .Kind = OpKind::BoolEqual });
                         ops.push_back({ .Kind = OpKind::BoolNot });
                     } break;
@@ -534,61 +569,65 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                         std::exit(1);
                     } break;
                 }
-                typeStack.push_back({ Type::Bool, token.Location });
+                typeStack.push_back({ TypeKind::Bool, token.Location });
             } break;
 
             case TokenKind::LessThan: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerLessThan });
-                typeStack.push_back({ Type::Bool, token.Location });
+                typeStack.push_back({ TypeKind::Bool, token.Location });
             } break;
 
             case TokenKind::GreaterThan: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerGreaterThan });
-                typeStack.push_back({ Type::Bool, token.Location });
+                typeStack.push_back({ TypeKind::Bool, token.Location });
             } break;
 
             case TokenKind::LessThanOrEqual: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerGreaterThan });
                 ops.push_back({ .Kind = OpKind::BoolNot });
-                typeStack.push_back({ Type::Bool, token.Location });
+                typeStack.push_back({ TypeKind::Bool, token.Location });
             } break;
 
             case TokenKind::GreaterThanOrEqual: {
-                expectTypesLiteral({ Type::Integer, Type::Integer }, token.Location);
+                expectTypesLiteral({ TypeKind::Integer, TypeKind::Integer }, token.Location);
                 typeStack.pop_back();
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::IntegerLessThan });
                 ops.push_back({ .Kind = OpKind::BoolNot });
-                typeStack.push_back({ Type::Bool, token.Location });
+                typeStack.push_back({ TypeKind::Bool, token.Location });
             } break;
 
             case TokenKind::Not: {
-                expectTypesLiteral({ Type::Bool }, token.Location);
+                expectTypesLiteral({ TypeKind::Bool }, token.Location);
                 typeStack.pop_back();
                 ops.push_back({ .Kind = OpKind::BoolNot });
-                typeStack.push_back({ Type::Bool, token.Location });
+                typeStack.push_back({ TypeKind::Bool, token.Location });
             } break;
 
             case TokenKind::Print: {
                 expectTypeCount(1, token.Location);
                 auto [type, location] = typeStack.back();
                 typeStack.pop_back();
-                switch (type) {
-                    case Type::Integer: {
+                switch (type.Kind) {
+                    case TypeKind::Integer: {
                         ops.push_back({ .Kind = OpKind::IntegerPrint });
                     } break;
 
-                    case Type::Bool: {
+                    case TypeKind::Bool: {
                         ops.push_back({ .Kind = OpKind::BoolPrint });
+                    } break;
+
+                    case TypeKind::Type: {
+                        ops.push_back({ .Kind = OpKind::TypePrint });
                     } break;
 
                     default: {
@@ -603,6 +642,43 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                         std::exit(1);
                     } break;
                 }
+            } break;
+
+            case TokenKind::Pointer: {
+                expectTypesLiteral({ TypeKind::Type }, token.Location);
+                typeStack.pop_back();
+                ops.push_back({ .Kind = OpKind::TypePointerTo });
+                typeStack.push_back({ TypeKind::Type, token.Location });
+            } break;
+
+            case TokenKind::Dereference: {
+                fflush(stdout);
+                fprintf(stderr,
+                        "%.*s:%llu:%llu: ^ is not supported yet\n",
+                        STR_FORMAT(token.Location.Filepath),
+                        token.Location.Line,
+                        token.Location.Column);
+                std::exit(1);
+            } break;
+
+            case TokenKind::AssignLeft: {
+                fflush(stdout);
+                fprintf(stderr,
+                        "%.*s:%llu:%llu: <- is not supported yet\n",
+                        STR_FORMAT(token.Location.Filepath),
+                        token.Location.Line,
+                        token.Location.Column);
+                std::exit(1);
+            } break;
+
+            case TokenKind::AssignRight: {
+                fflush(stdout);
+                fprintf(stderr,
+                        "%.*s:%llu:%llu: -> is not supported yet\n",
+                        STR_FORMAT(token.Location.Filepath),
+                        token.Location.Line,
+                        token.Location.Column);
+                std::exit(1);
             } break;
 
             case TokenKind::If: {
@@ -639,12 +715,12 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
             case TokenKind::Dup: {
                 expectTypeCount(1, token.Location);
                 auto [type, location] = typeStack.back();
-                switch (type) {
-                    case Type::Integer: {
+                switch (type.Kind) {
+                    case TypeKind::Integer: {
                         ops.push_back({ .Kind = OpKind::IntegerDup });
                     } break;
 
-                    case Type::Bool: {
+                    case TypeKind::Bool: {
                         ops.push_back({ .Kind = OpKind::BoolDup });
                     } break;
 
@@ -667,12 +743,12 @@ std::vector<Op> CompileOps(std::string_view filepath, std::string_view source) {
                 expectTypeCount(1, token.Location);
                 auto [type, location] = typeStack.back();
                 typeStack.pop_back();
-                switch (type) {
-                    case Type::Integer: {
+                switch (type.Kind) {
+                    case TypeKind::Integer: {
                         ops.push_back({ .Kind = OpKind::IntegerDrop });
                     } break;
 
-                    case Type::Bool: {
+                    case TypeKind::Bool: {
                         ops.push_back({ .Kind = OpKind::BoolDrop });
                     } break;
 

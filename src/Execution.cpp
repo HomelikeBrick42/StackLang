@@ -167,6 +167,59 @@ std::vector<Value> ExecuteOps(std::span<Op> ops) {
                 stack.pop_back();
                 printf("%s\n", value ? "true" : "false");
             } break;
+
+            case OpKind::TypePush: {
+                stack.emplace_back(std::get<Type>(op.Data));
+            } break;
+
+            case OpKind::TypeDup: {
+                auto value = std::get<Type>(stack.back());
+                stack.emplace_back(value);
+            } break;
+
+            case OpKind::TypeDrop: {
+                (void)std::get<Type>(stack.back());
+                stack.pop_back();
+            } break;
+
+            case OpKind::TypePointerTo: {
+                std::get<Type>(stack.back()).PointerDepth++;
+            } break;
+
+            case OpKind::TypeEqual: {
+                auto b = std::get<Type>(stack.back());
+                stack.pop_back();
+                auto a = std::get<Type>(stack.back());
+                stack.pop_back();
+                stack.emplace_back(a == b);
+            } break;
+
+            case OpKind::TypePrint: {
+                auto value = std::get<Type>(stack.back());
+                stack.pop_back();
+                switch (value.Kind) {
+                    case TypeKind::Invalid: {
+                        assert(false);
+                        std::exit(-1);
+                    } break;
+
+                    case TypeKind::Type: {
+                        printf("type");
+                    } break;
+
+                    case TypeKind::Integer: {
+                        printf("int");
+                    } break;
+
+                    case TypeKind::Bool: {
+                        printf("bool");
+                    } break;
+                }
+                for (size_t i = 0; i < value.PointerDepth; i++) {
+                    printf("@");
+                }
+                printf("\n");
+            } break;
         }
         ip++;
     }
