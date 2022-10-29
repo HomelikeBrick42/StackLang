@@ -189,15 +189,17 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
             Op::ExitScope => {
                 locals.pop().unwrap(); // not an explicit instruction in the language so this *should* never break :)
             }
-            Op::CreateLocal(name) => {
-                let value = stack
-                    .pop()
-                    .expect("Expected value to create new local variable with but got nothing");
-                assert_eq!(
-                    locals.last_mut().unwrap().insert(name.clone(), value),
-                    None,
-                    "Redeclaration of local variable '{name}'"
-                );
+            Op::NewLocals(names) => {
+                for name in names {
+                    let value = stack
+                        .pop()
+                        .expect("Expected value to create new local variable with but got nothing");
+                    assert_eq!(
+                        locals.last_mut().unwrap().insert(name.clone(), value),
+                        None,
+                        "Redeclaration of local variable '{name}'"
+                    );
+                }
             }
             Op::GetLocal(name) => {
                 let local = locals

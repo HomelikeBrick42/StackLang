@@ -66,7 +66,7 @@ print_type load call
 
 34
 proc(int) -> (proc_type(int) -> (int)) {
-    new_local value
+    new_local("value")
     proc(int) -> (int) {
         value load add
     }

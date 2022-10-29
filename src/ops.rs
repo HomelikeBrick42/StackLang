@@ -17,7 +17,7 @@ pub enum Op {
     DivMod,
     EnterScope,
     ExitScope,
-    CreateLocal(String),
+    NewLocals(Vec<String>),
     GetLocal(String),
     Load,
     Store,
@@ -118,18 +118,20 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
             Op::ExitScope => {
                 locals.pop();
             }
-            Op::CreateLocal(name) => {
-                let value = stack
-                    .pop()
-                    .expect("Expected value to create new local variable with but got nothing");
-                assert!(
-                    locals
-                        .last_mut()
-                        .unwrap()
-                        .insert(name.clone(), Rc::new(Cell::new(value)))
-                        .is_none(),
-                    "Redeclaration of local variable '{name}'"
-                );
+            Op::NewLocals(names) => {
+                for name in names {
+                    let value = stack
+                        .pop()
+                        .expect("Expected value to create new local variable with but got nothing");
+                    assert!(
+                        locals
+                            .last_mut()
+                            .unwrap()
+                            .insert(name.clone(), Rc::new(Cell::new(value)))
+                            .is_none(),
+                        "Redeclaration of local variable '{name}'"
+                    );
+                }
             }
             Op::GetLocal(name) => {
                 let local = locals
