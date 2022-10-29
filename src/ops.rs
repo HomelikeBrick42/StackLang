@@ -8,7 +8,7 @@ pub enum Op {
     Dup,
     Drop,
     Over(usize), // 0 is the current top of the stack
-    MakeFunction { typ: Type, ops: Rc<Vec<Op>> },
+    MakeProcedure { typ: Type, ops: Rc<Vec<Op>> },
     Call,
     Return,
     Add,
@@ -52,7 +52,7 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
                 let value = stack.remove(stack.len() - depth - 1);
                 stack.push(value);
             }
-            Op::MakeFunction { typ, ops } => {
+            Op::MakeProcedure { typ, ops } => {
                 let mut current_locals = HashMap::new();
                 for (name, local) in locals.iter().rev().flatten() {
                     if !current_locals.contains_key(name) {
@@ -79,14 +79,7 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
                 let b = stack.pop().unwrap();
                 let a = stack.pop().unwrap();
                 match (a, b) {
-                    (Value::S64(a), Value::S64(b)) => stack.push(Value::S64(a + b)),
-                    (Value::S32(a), Value::S32(b)) => stack.push(Value::S32(a + b)),
-                    (Value::S16(a), Value::S16(b)) => stack.push(Value::S16(a + b)),
-                    (Value::S8(a), Value::S8(b)) => stack.push(Value::S8(a + b)),
-                    (Value::U64(a), Value::U64(b)) => stack.push(Value::U64(a + b)),
-                    (Value::U32(a), Value::U32(b)) => stack.push(Value::U32(a + b)),
-                    (Value::U16(a), Value::U16(b)) => stack.push(Value::U16(a + b)),
-                    (Value::U8(a), Value::U8(b)) => stack.push(Value::U8(a + b)),
+                    (Value::Integer(a), Value::Integer(b)) => stack.push(Value::Integer(a + b)),
                     (_, _) => todo!(),
                 }
             }
@@ -94,14 +87,7 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
                 let b = stack.pop().unwrap();
                 let a = stack.pop().unwrap();
                 match (a, b) {
-                    (Value::S64(a), Value::S64(b)) => stack.push(Value::S64(a - b)),
-                    (Value::S32(a), Value::S32(b)) => stack.push(Value::S32(a - b)),
-                    (Value::S16(a), Value::S16(b)) => stack.push(Value::S16(a - b)),
-                    (Value::S8(a), Value::S8(b)) => stack.push(Value::S8(a - b)),
-                    (Value::U64(a), Value::U64(b)) => stack.push(Value::U64(a - b)),
-                    (Value::U32(a), Value::U32(b)) => stack.push(Value::U32(a - b)),
-                    (Value::U16(a), Value::U16(b)) => stack.push(Value::U16(a - b)),
-                    (Value::U8(a), Value::U8(b)) => stack.push(Value::U8(a - b)),
+                    (Value::Integer(a), Value::Integer(b)) => stack.push(Value::Integer(a - b)),
                     (_, _) => todo!(),
                 }
             }
@@ -109,14 +95,7 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
                 let b = stack.pop().unwrap();
                 let a = stack.pop().unwrap();
                 match (a, b) {
-                    (Value::S64(a), Value::S64(b)) => stack.push(Value::S64(a * b)),
-                    (Value::S32(a), Value::S32(b)) => stack.push(Value::S32(a * b)),
-                    (Value::S16(a), Value::S16(b)) => stack.push(Value::S16(a * b)),
-                    (Value::S8(a), Value::S8(b)) => stack.push(Value::S8(a * b)),
-                    (Value::U64(a), Value::U64(b)) => stack.push(Value::U64(a * b)),
-                    (Value::U32(a), Value::U32(b)) => stack.push(Value::U32(a * b)),
-                    (Value::U16(a), Value::U16(b)) => stack.push(Value::U16(a * b)),
-                    (Value::U8(a), Value::U8(b)) => stack.push(Value::U8(a * b)),
+                    (Value::Integer(a), Value::Integer(b)) => stack.push(Value::Integer(a * b)),
                     (_, _) => todo!(),
                 }
             }
@@ -124,37 +103,9 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
                 let b = stack.pop().unwrap();
                 let a = stack.pop().unwrap();
                 match (a, b) {
-                    (Value::S64(a), Value::S64(b)) => {
-                        stack.push(Value::S64(a / b));
-                        stack.push(Value::S64(a % b));
-                    }
-                    (Value::S32(a), Value::S32(b)) => {
-                        stack.push(Value::S32(a / b));
-                        stack.push(Value::S32(a % b))
-                    }
-                    (Value::S16(a), Value::S16(b)) => {
-                        stack.push(Value::S16(a / b));
-                        stack.push(Value::S16(a % b))
-                    }
-                    (Value::S8(a), Value::S8(b)) => {
-                        stack.push(Value::S8(a / b));
-                        stack.push(Value::S8(a % b))
-                    }
-                    (Value::U64(a), Value::U64(b)) => {
-                        stack.push(Value::U64(a / b));
-                        stack.push(Value::U64(a % b))
-                    }
-                    (Value::U32(a), Value::U32(b)) => {
-                        stack.push(Value::U32(a / b));
-                        stack.push(Value::U32(a % b))
-                    }
-                    (Value::U16(a), Value::U16(b)) => {
-                        stack.push(Value::U16(a / b));
-                        stack.push(Value::U16(a % b))
-                    }
-                    (Value::U8(a), Value::U8(b)) => {
-                        stack.push(Value::U8(a / b));
-                        stack.push(Value::U8(a % b))
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        stack.push(Value::Integer(a / b));
+                        stack.push(Value::Integer(a % b));
                     }
                     (_, _) => todo!(),
                 }

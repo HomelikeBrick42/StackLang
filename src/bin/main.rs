@@ -1,21 +1,21 @@
 use std::{cell::Cell, collections::HashMap, rc::Rc};
 
-use stack_lang::{Op::*, *};
+use stack_lang::*;
 
 fn main() {
     let builtins = HashMap::from([
         (
-            "print_s64".to_string(),
+            "print_int".to_string(),
             Value::BuiltinFunction(
-                Type::Function {
-                    arguments: vec![Type::S64],
+                Type::Procedure {
+                    arguments: vec![Type::Integer],
                     return_values: vec![],
                 },
                 Rc::new(|stack| {
                     let value = stack.pop().unwrap();
                     match value {
-                        Value::S64(value) => println!("{value}"),
-                        _ => panic!("Expected a s64"),
+                        Value::Integer(value) => println!("{value}"),
+                        _ => panic!("Expected an int"),
                     }
                 }),
             ),
@@ -23,7 +23,7 @@ fn main() {
         (
             "print_type".to_string(),
             Value::BuiltinFunction(
-                Type::Function {
+                Type::Procedure {
                     arguments: vec![Type::Type],
                     return_values: vec![],
                 },
@@ -38,74 +38,27 @@ fn main() {
         ),
     ]);
 
-    let ops = [
-        EnterScope,
-        Push(Value::S64(5)),
-        Push(Value::S64(42)),
-        Push(Value::S64(6)),
-        Over(1),
-        Drop,
-        Add,
-        GetLocal("print_s64".into()),
-        Load,
-        Call,
-        Push(Value::Type(Type::Function {
-            arguments: vec![Type::S64, Type::S64],
-            return_values: vec![Type::S64],
-        })),
-        GetLocal("print_type".into()),
-        Load,
-        Call,
-        Push(Value::S64(34)),
-        MakeFunction {
-            typ: Type::Function {
-                arguments: vec![Type::S64],
-                return_values: vec![Type::Function {
-                    arguments: vec![Type::S64],
-                    return_values: vec![Type::S64],
-                }],
-            },
-            ops: Rc::new(vec![
-                EnterScope,
-                CreateLocal("value".into()),
-                MakeFunction {
-                    typ: Type::Function {
-                        arguments: vec![Type::S64],
-                        return_values: vec![Type::S64],
-                    },
-                    ops: Rc::new(vec![
-                        EnterScope,
-                        GetLocal("value".into()),
-                        Load,
-                        Add,
-                        ExitScope,
-                        Return,
-                    ]),
-                },
-                ExitScope,
-                Return,
-            ]),
-        },
-        Call,
-        Push(Value::S64(35)),
-        Over(1),
-        Call,
-        GetLocal("print_s64".into()),
-        Load,
-        Call,
-        ExitScope,
-        Return,
-    ];
+    let source = r"
+5 42 6
+over1 drop add
+print_int load call
 
-    let mut type_stack = vec![];
-    type_check(
-        &ops,
-        &mut type_stack,
-        builtins
-            .iter()
-            .map(|(name, value)| (name.clone(), value.get_type()))
-            .collect(),
-    );
+proc_type(int int) -> (int)
+print_type load call
+
+34
+proc(int) -> (proc_type(int) -> (int)) {
+    new_local value
+    proc(int) -> (int) {
+        value load add
+    }
+}
+call
+35 over1 call
+print_int load call
+";
+
+    let ops = compile_ops(source, &builtins);
 
     execute(
         &ops,

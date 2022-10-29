@@ -9,15 +9,8 @@ pub enum Type {
     String,
     Boolean,
     Character,
-    S64,
-    S32,
-    S16,
-    S8,
-    U64,
-    U32,
-    U16,
-    U8,
-    Function {
+    Integer,
+    Procedure {
         arguments: Vec<Type>,
         return_values: Vec<Type>,
     },
@@ -30,17 +23,10 @@ impl std::fmt::Display for Type {
             Type::Null => write!(f, "null_type"),
             Type::Type => write!(f, "type"),
             Type::String => write!(f, "string"),
-            Type::Boolean => write!(f, "boolean"),
-            Type::Character => write!(f, "character"),
-            Type::S64 => write!(f, "s64"),
-            Type::S32 => write!(f, "s32"),
-            Type::S16 => write!(f, "s16"),
-            Type::S8 => write!(f, "s8"),
-            Type::U64 => write!(f, "u64"),
-            Type::U32 => write!(f, "u32"),
-            Type::U16 => write!(f, "u16"),
-            Type::U8 => write!(f, "u8"),
-            Type::Function {
+            Type::Boolean => write!(f, "bool"),
+            Type::Character => write!(f, "char"),
+            Type::Integer => write!(f, "int"),
+            Type::Procedure {
                 arguments,
                 return_values,
             } => {
@@ -102,7 +88,7 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                 let value = stack.remove(stack.len() - depth - 1);
                 stack.push(value);
             }
-            Op::MakeFunction { typ, ops } => {
+            Op::MakeProcedure { typ, ops } => {
                 let mut current_locals = HashMap::new();
                 for (name, local) in locals.iter().rev().flatten() {
                     if !current_locals.contains_key(name) {
@@ -110,11 +96,11 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                     }
                 }
                 let (arguments, return_values) = match typ {
-                    Type::Function {
+                    Type::Procedure {
                         arguments,
                         return_values,
                     } => (arguments, return_values),
-                    _ => panic!("Expected function type but got type '{typ}'"),
+                    _ => panic!("Expected procedure type but got type '{typ}'"),
                 };
                 let mut func_stack = arguments.clone();
                 type_check(ops, &mut func_stack, current_locals);
@@ -122,15 +108,15 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                 stack.push(typ.clone());
             }
             Op::Call => {
-                let function_type = stack
+                let procedure_type = stack
                     .pop()
-                    .expect("Expected a function on the stack but got nothing");
-                let (arguments, return_values) = match &function_type {
-                    Type::Function {
+                    .expect("Expected a procedure on the stack but got nothing");
+                let (arguments, return_values) = match &procedure_type {
+                    Type::Procedure {
                         arguments,
                         return_values,
                     } => (arguments, return_values),
-                    _ => panic!("Expected a function to call but got type '{function_type}'"),
+                    _ => panic!("Expected a procedure to call but got type '{procedure_type}'"),
                 };
                 for (i, typ) in arguments.iter().enumerate().rev() {
                     let actual_typ = stack.pop().expect(&format!(
@@ -152,14 +138,7 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                     .pop()
                     .expect("Expected second operand to add on the stack but got nothing");
                 stack.push(match (&a, &b) {
-                    (Type::S64, Type::S64) => Type::S64,
-                    (Type::S32, Type::S32) => Type::S32,
-                    (Type::S16, Type::S16) => Type::S16,
-                    (Type::S8, Type::S8) => Type::S8,
-                    (Type::U64, Type::U64) => Type::U64,
-                    (Type::U32, Type::U32) => Type::U32,
-                    (Type::U16, Type::U16) => Type::U16,
-                    (Type::U8, Type::U8) => Type::U8,
+                    (Type::Integer, Type::Integer) => Type::Integer,
                     _ => panic!("Cannot add types '{a}' and '{b}'"),
                 });
             }
@@ -171,14 +150,7 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                     .pop()
                     .expect("Expected second operand to subtract on the stack but got nothing");
                 stack.push(match (&a, &b) {
-                    (Type::S64, Type::S64) => Type::S64,
-                    (Type::S32, Type::S32) => Type::S32,
-                    (Type::S16, Type::S16) => Type::S16,
-                    (Type::S8, Type::S8) => Type::S8,
-                    (Type::U64, Type::U64) => Type::U64,
-                    (Type::U32, Type::U32) => Type::U32,
-                    (Type::U16, Type::U16) => Type::U16,
-                    (Type::U8, Type::U8) => Type::U8,
+                    (Type::Integer, Type::Integer) => Type::Integer,
                     _ => panic!("Cannot subtract types '{a}' and '{b}'"),
                 });
             }
@@ -190,14 +162,7 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                     .pop()
                     .expect("Expected second operand to multiply on the stack but got nothing");
                 stack.push(match (&a, &b) {
-                    (Type::S64, Type::S64) => Type::S64,
-                    (Type::S32, Type::S32) => Type::S32,
-                    (Type::S16, Type::S16) => Type::S16,
-                    (Type::S8, Type::S8) => Type::S8,
-                    (Type::U64, Type::U64) => Type::U64,
-                    (Type::U32, Type::U32) => Type::U32,
-                    (Type::U16, Type::U16) => Type::U16,
-                    (Type::U8, Type::U8) => Type::U8,
+                    (Type::Integer, Type::Integer) => Type::Integer,
                     _ => panic!("Cannot multiply types '{a}' and '{b}'"),
                 });
             }
@@ -209,37 +174,9 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                     .pop()
                     .expect("Expected second operand to divmod on the stack but got nothing");
                 match (&a, &b) {
-                    (Type::S64, Type::S64) => {
-                        stack.push(Type::S64);
-                        stack.push(Type::S64);
-                    }
-                    (Type::S32, Type::S32) => {
-                        stack.push(Type::S32);
-                        stack.push(Type::S32);
-                    }
-                    (Type::S16, Type::S16) => {
-                        stack.push(Type::S16);
-                        stack.push(Type::S16);
-                    }
-                    (Type::S8, Type::S8) => {
-                        stack.push(Type::S8);
-                        stack.push(Type::S8);
-                    }
-                    (Type::U64, Type::U64) => {
-                        stack.push(Type::U64);
-                        stack.push(Type::U64);
-                    }
-                    (Type::U32, Type::U32) => {
-                        stack.push(Type::U32);
-                        stack.push(Type::U32);
-                    }
-                    (Type::U16, Type::U16) => {
-                        stack.push(Type::U16);
-                        stack.push(Type::U16);
-                    }
-                    (Type::U8, Type::U8) => {
-                        stack.push(Type::U8);
-                        stack.push(Type::U8);
+                    (Type::Integer, Type::Integer) => {
+                        stack.push(Type::Integer);
+                        stack.push(Type::Integer);
                     }
                     _ => panic!("Cannot use divmod on types '{a}' and '{b}'"),
                 };
