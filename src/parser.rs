@@ -71,6 +71,8 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
             source = &source[identifier.len()..];
             match identifier {
                 "int" => ops.push(Op::Push(Value::Type(Type::Integer))),
+                "dup" => ops.push(Op::Dup),
+                "ref" => ops.push(Op::MakeReferenceType),
                 "drop" => ops.push(Op::Drop),
                 "over" => {
                     if let Some(m) = WHITESPACE.find(source) {

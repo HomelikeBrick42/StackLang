@@ -77,6 +77,18 @@ print_int load call
 
 "hello"
 print_string load call
+
+5
+new_local("test")
+
+proc(int ref) -> () {
+    dup load
+    26 add
+    over(1)
+    store
+}
+test over(1) call
+test load print_int load call
 "#;
 
     let ops = compile_ops(source, &builtins);
