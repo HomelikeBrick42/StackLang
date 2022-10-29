@@ -44,6 +44,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
         static ref WHITESPACE: Regex = Regex::new(r"^\s+").unwrap();
         static ref NUMBER: Regex = Regex::new(r"^[0-9]+").unwrap();
         static ref IDENTIFIER: Regex = Regex::new(r"^[_A-Za-z][_0-9A-Za-z]*").unwrap();
+        static ref STRING_LITERAL: Regex = Regex::new(r#"^"(.*?)""#).unwrap();
         static ref PROCEDURE_ARROW: Regex = Regex::new(r"^\s*->\s*\(").unwrap();
     }
 
@@ -57,6 +58,11 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
             let number = m.as_str();
             source = &source[number.len()..];
             ops.push(Op::Push(Value::Integer(number.parse().unwrap())));
+        } else if let Some(m) = STRING_LITERAL.find(source) {
+            let str = m.as_str();
+            source = &source[str.len()..];
+            let captures = STRING_LITERAL.captures(str).unwrap();
+            ops.push(Op::Push(Value::String(captures[1].into())));
         } else if let Some(m) = IDENTIFIER.find(source) {
             let identifier = m.as_str();
             source = &source[identifier.len()..];

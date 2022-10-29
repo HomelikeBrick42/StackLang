@@ -5,6 +5,22 @@ use stack_lang::*;
 fn main() {
     let builtins = HashMap::from([
         (
+            "print_type".to_string(),
+            Value::BuiltinFunction(
+                Type::Procedure {
+                    arguments: vec![Type::Type],
+                    return_values: vec![],
+                },
+                Rc::new(|stack| {
+                    let value = stack.pop().unwrap();
+                    match value {
+                        Value::Type(typ) => println!("{typ}"),
+                        _ => panic!("Expected a type"),
+                    }
+                }),
+            ),
+        ),
+        (
             "print_int".to_string(),
             Value::BuiltinFunction(
                 Type::Procedure {
@@ -21,24 +37,24 @@ fn main() {
             ),
         ),
         (
-            "print_type".to_string(),
+            "print_string".to_string(),
             Value::BuiltinFunction(
                 Type::Procedure {
-                    arguments: vec![Type::Type],
+                    arguments: vec![Type::String],
                     return_values: vec![],
                 },
                 Rc::new(|stack| {
                     let value = stack.pop().unwrap();
                     match value {
-                        Value::Type(typ) => println!("{typ}"),
-                        _ => panic!("Expected a type"),
+                        Value::String(str) => println!("{str}"),
+                        _ => panic!("Expected a string"),
                     }
                 }),
             ),
         ),
     ]);
 
-    let source = r"
+    let source = r#"
 5 42 6
 over(2 1)
 print_int load call
@@ -58,7 +74,10 @@ proc(int) -> (proc_type(int) -> (int)) {
 call
 35 over(1) call
 print_int load call
-";
+
+"hello"
+print_string load call
+"#;
 
     let ops = compile_ops(source, &builtins);
 
