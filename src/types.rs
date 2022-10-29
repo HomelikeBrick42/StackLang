@@ -78,15 +78,17 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                 );
                 stack.pop();
             }
-            Op::Over(depth) => {
-                assert!(
-                    stack.len() > *depth,
-                    "The stack only has {} elements but tried to get an element {} elements deep",
-                    stack.len(),
-                    depth + 1
-                );
-                let value = stack.remove(stack.len() - depth - 1);
-                stack.push(value);
+            Op::Over(depths) => {
+                for depth in depths {
+                    assert!(
+                        stack.len() > *depth,
+                        "The stack only has {} elements but tried to get an element {} elements deep",
+                        stack.len(),
+                        depth + 1
+                    );
+                    let value = stack.remove(stack.len() - depth - 1);
+                    stack.push(value);
+                }
             }
             Op::MakeProcedure { typ, ops } => {
                 let mut current_locals = HashMap::new();

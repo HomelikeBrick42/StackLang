@@ -7,7 +7,7 @@ pub enum Op {
     Push(Value),
     Dup,
     Drop,
-    Over(usize), // 0 is the current top of the stack
+    Over(Vec<usize>), // 0 is the current top of the stack
     MakeProcedure { typ: Type, ops: Rc<Vec<Op>> },
     Call,
     Return,
@@ -48,9 +48,11 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
             Op::Drop => {
                 stack.pop();
             }
-            Op::Over(depth) => {
-                let value = stack.remove(stack.len() - depth - 1);
-                stack.push(value);
+            Op::Over(depths) => {
+                for depth in depths {
+                    let value = stack.remove(stack.len() - depth - 1);
+                    stack.push(value);
+                }
             }
             Op::MakeProcedure { typ, ops } => {
                 let mut current_locals = HashMap::new();

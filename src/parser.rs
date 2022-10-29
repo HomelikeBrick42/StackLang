@@ -6,6 +6,9 @@ use regex::Regex;
 use crate::{execute, type_check, Op, Type, Value};
 
 enum ParseScope {
+    Over {
+        old_ops: Vec<Op>,
+    },
     ProcTypeParameterTypes {
         old_ops: Vec<Op>,
     },
@@ -41,7 +44,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
         static ref WHITESPACE: Regex = Regex::new(r"^\s+").unwrap();
         static ref NUMBER: Regex = Regex::new(r"^[0-9]+").unwrap();
         static ref IDENTIFIER: Regex = Regex::new(r"^[_A-Za-z][_0-9A-Za-z]*").unwrap();
-        static ref OVER: Regex = Regex::new(r"^over[0-9]+$").unwrap();
         static ref PROCEDURE_ARROW: Regex = Regex::new(r"^\s*->\s*\(").unwrap();
     }
 
@@ -58,47 +60,87 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
         } else if let Some(m) = IDENTIFIER.find(source) {
             let identifier = m.as_str();
             source = &source[identifier.len()..];
-            if OVER.is_match(identifier) {
-                let value = m.as_str()[4..].parse::<usize>().unwrap();
-                ops.push(Op::Over(value));
-            } else {
-                match identifier {
-                    "int" => ops.push(Op::Push(Value::Type(Type::Integer))),
-                    "drop" => ops.push(Op::Drop),
-                    "add" => ops.push(Op::Add),
-                    "sub" => ops.push(Op::Subtract),
-                    "mul" => ops.push(Op::Multiply),
-                    "divmod" => ops.push(Op::DivMod),
-                    "load" => ops.push(Op::Load),
-                    "store" => ops.push(Op::Store),
-                    "call" => ops.push(Op::Call),
-                    "return" => ops.push(Op::Return),
-                    "new_local" => {
-                        if let Some(m) = WHITESPACE.find(source) {
-                            source = &source[m.as_str().len()..];
-                        }
-                        let name = IDENTIFIER.find(source).unwrap().as_str();
-                        source = &source[name.len()..];
-                        ops.push(Op::CreateLocal(name.into()));
+            match identifier {
+                "int" => ops.push(Op::Push(Value::Type(Type::Integer))),
+                "drop" => ops.push(Op::Drop),
+                "over" => {
+                    if let Some(m) = WHITESPACE.find(source) {
+                        source = &source[m.as_str().len()..];
                     }
-                    "proc_type" => {
-                        assert_eq!(source.chars().next().unwrap(), '(');
-                        source = &source[1..];
-                        parse_scopes.push(ParseScope::ProcTypeParameterTypes { old_ops: ops });
-                        ops = vec![Op::EnterScope];
-                    }
-                    "proc" => {
-                        assert_eq!(source.chars().next().unwrap(), '(');
-                        source = &source[1..];
-                        parse_scopes.push(ParseScope::ProcParameterTypes { old_ops: ops });
-                        ops = vec![Op::EnterScope];
-                    }
-                    _ => ops.push(Op::GetLocal(identifier.into())),
+                    assert_eq!(source.chars().next().unwrap(), '(');
+                    source = &source[1..];
+                    parse_scopes.push(ParseScope::Over { old_ops: ops });
+                    ops = vec![Op::EnterScope];
                 }
+                "add" => ops.push(Op::Add),
+                "sub" => ops.push(Op::Subtract),
+                "mul" => ops.push(Op::Multiply),
+                "divmod" => ops.push(Op::DivMod),
+                "load" => ops.push(Op::Load),
+                "store" => ops.push(Op::Store),
+                "call" => ops.push(Op::Call),
+                "return" => ops.push(Op::Return),
+                "new_local" => {
+                    if let Some(m) = WHITESPACE.find(source) {
+                        source = &source[m.as_str().len()..];
+                    }
+                    let name = IDENTIFIER.find(source).unwrap().as_str();
+                    source = &source[name.len()..];
+                    ops.push(Op::CreateLocal(name.into()));
+                }
+                "proc_type" => {
+                    if let Some(m) = WHITESPACE.find(source) {
+                        source = &source[m.as_str().len()..];
+                    }
+                    assert_eq!(source.chars().next().unwrap(), '(');
+                    source = &source[1..];
+                    parse_scopes.push(ParseScope::ProcTypeParameterTypes { old_ops: ops });
+                    ops = vec![Op::EnterScope];
+                }
+                "proc" => {
+                    if let Some(m) = WHITESPACE.find(source) {
+                        source = &source[m.as_str().len()..];
+                    }
+                    assert_eq!(source.chars().next().unwrap(), '(');
+                    source = &source[1..];
+                    parse_scopes.push(ParseScope::ProcParameterTypes { old_ops: ops });
+                    ops = vec![Op::EnterScope];
+                }
+                _ => ops.push(Op::GetLocal(identifier.into())),
             }
         } else if source.chars().next().unwrap() == ')' && parse_scopes.len() > 0 {
             source = &source[1..];
             match parse_scopes.pop().unwrap() {
+                ParseScope::Over { old_ops } => {
+                    ops.push(Op::ExitScope);
+                    ops.push(Op::Return);
+                    let mut type_stack = vec![];
+                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    for typ in type_stack {
+                        assert_eq!(
+                            typ,
+                            Type::Integer,
+                            "All elements left on the over offset stack must be integers"
+                        );
+                    }
+                    let mut values = vec![];
+                    execute(&ops, &mut values, builtin_values.clone());
+                    let offsets = values
+                        .into_iter()
+                        .map(|value| match value {
+                            Value::Integer(value) => {
+                                assert!(
+                                    value >= 0,
+                                    "all over offsets must be positive but got {value}"
+                                );
+                                value as usize
+                            }
+                            _ => unreachable!(),
+                        })
+                        .collect();
+                    ops = old_ops;
+                    ops.push(Op::Over(offsets));
+                }
                 ParseScope::ProcTypeParameterTypes { old_ops } => {
                     ops.push(Op::ExitScope);
                     ops.push(Op::Return);
@@ -228,6 +270,9 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
         } else if source.chars().next().unwrap() == '}' && parse_scopes.len() > 0 {
             source = &source[1..];
             match parse_scopes.pop().unwrap() {
+                ParseScope::Over { .. } => {
+                    panic!("Cannot use '}}' to close an over");
+                }
                 ParseScope::ProcTypeParameterTypes { .. } => {
                     panic!("Cannot use '}}' to close a proc_type parameter type");
                 }

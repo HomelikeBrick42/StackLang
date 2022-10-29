@@ -40,7 +40,9 @@ fn main() {
 
     let source = r"
 5 42 6
-over1 drop add
+over(2 1)
+print_int load call
+print_int load call
 print_int load call
 
 proc_type(int int) -> (int)
@@ -54,7 +56,7 @@ proc(int) -> (proc_type(int) -> (int)) {
     }
 }
 call
-35 over1 call
+35 over(1) call
 print_int load call
 ";
 
