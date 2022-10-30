@@ -57,29 +57,29 @@ fn main() {
     let source = r#"
 5 42 6
 over(2 1)
-print_int load call
-print_int load call
-print_int load call
+get("print_int") load call
+get("print_int") load call
+get("print_int") load call
 
 proc_type(int int) -> (int)
-print_type load call
+get("print_type") load call
 
 34
 proc(int) -> (proc_type(int) -> (int)) {
-    new_local("value")
+    var("value")
     proc(int) -> (int) {
-        value load add
+        get("value") load add
     }
 }
 call
 35 over(1) call
-print_int load call
+get("print_int") load call
 
 "hello"
-print_string load call
+get("print_string") load call
 
 5
-new_local("test")
+var("test")
 
 proc(int ref) -> () {
     dup load
@@ -87,8 +87,9 @@ proc(int ref) -> () {
     over(1)
     store
 }
-test over(1) call
-test load print_int load call
+get("test") over(1) call
+get("test") load
+get("print_int") load call
 "#;
 
     let ops = compile_ops(source, &builtins);

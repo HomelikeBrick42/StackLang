@@ -201,22 +201,24 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                     );
                 }
             }
-            Op::GetLocal(name) => {
-                let local = locals
-                    .iter()
-                    .rev()
-                    .flatten()
-                    .find_map(|(local_name, value)| {
-                        if local_name == name {
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    });
-                if let Some(local) = local {
-                    stack.push(Type::Reference(Box::new(local.clone())));
-                } else {
-                    panic!("Unable to find name '{name}'");
+            Op::GetLocals(names) => {
+                for name in names {
+                    let local = locals
+                        .iter()
+                        .rev()
+                        .flatten()
+                        .find_map(|(local_name, value)| {
+                            if local_name == name {
+                                Some(value)
+                            } else {
+                                None
+                            }
+                        });
+                    if let Some(local) = local {
+                        stack.push(Type::Reference(Box::new(local.clone())));
+                    } else {
+                        panic!("Unable to find name '{name}'");
+                    }
                 }
             }
             Op::Load => {

@@ -9,7 +9,10 @@ enum ParseScope {
     Over {
         old_ops: Vec<Op>,
     },
-    NewLocal {
+    Var {
+        old_ops: Vec<Op>,
+    },
+    Get {
         old_ops: Vec<Op>,
     },
     ProcTypeParameterTypes {
@@ -91,13 +94,22 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 "store" => ops.push(Op::Store),
                 "call" => ops.push(Op::Call),
                 "return" => ops.push(Op::Return),
-                "new_local" => {
+                "var" => {
                     if let Some(m) = WHITESPACE.find(source) {
                         source = &source[m.as_str().len()..];
                     }
                     assert_eq!(source.chars().next().unwrap(), '(');
                     source = &source[1..];
-                    parse_scopes.push(ParseScope::NewLocal { old_ops: ops });
+                    parse_scopes.push(ParseScope::Var { old_ops: ops });
+                    ops = vec![Op::EnterScope];
+                }
+                "get" => {
+                    if let Some(m) = WHITESPACE.find(source) {
+                        source = &source[m.as_str().len()..];
+                    }
+                    assert_eq!(source.chars().next().unwrap(), '(');
+                    source = &source[1..];
+                    parse_scopes.push(ParseScope::Get { old_ops: ops });
                     ops = vec![Op::EnterScope];
                 }
                 "proc_type" => {
@@ -118,7 +130,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     parse_scopes.push(ParseScope::ProcParameterTypes { old_ops: ops });
                     ops = vec![Op::EnterScope];
                 }
-                _ => ops.push(Op::GetLocal(identifier.into())),
+                _ => panic!("Unknown identifier '{identifier}'"),
             }
         } else if source.chars().next().unwrap() == ')' && parse_scopes.len() > 0 {
             source = &source[1..];
@@ -153,7 +165,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     ops = old_ops;
                     ops.push(Op::Over(offsets));
                 }
-                ParseScope::NewLocal { old_ops } => {
+                ParseScope::Var { old_ops } => {
                     ops.push(Op::ExitScope);
                     ops.push(Op::Return);
                     let mut type_stack = vec![];
@@ -162,7 +174,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         assert_eq!(
                             typ,
                             Type::String,
-                            "All elements left on the new local stack must be strings"
+                            "All elements left on the var name stack must be strings"
                         );
                     }
                     let mut values = vec![];
@@ -182,6 +194,36 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         .collect();
                     ops = old_ops;
                     ops.push(Op::NewLocals(names));
+                }
+                ParseScope::Get { old_ops } => {
+                    ops.push(Op::ExitScope);
+                    ops.push(Op::Return);
+                    let mut type_stack = vec![];
+                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    for typ in type_stack {
+                        assert_eq!(
+                            typ,
+                            Type::String,
+                            "All elements left on the get name stack must be strings"
+                        );
+                    }
+                    let mut values = vec![];
+                    execute(&ops, &mut values, builtin_values.clone());
+                    let names = values
+                        .into_iter()
+                        .map(|value| match value {
+                            Value::String(value) => {
+                                assert!(
+                                    IDENTIFIER.is_match(&value),
+                                    "Expected a valid identifier but got {value:?}"
+                                );
+                                value
+                            }
+                            _ => unreachable!(),
+                        })
+                        .collect();
+                    ops = old_ops;
+                    ops.push(Op::GetLocals(names));
                 }
                 ParseScope::ProcTypeParameterTypes { old_ops } => {
                     ops.push(Op::ExitScope);
@@ -315,8 +357,11 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 ParseScope::Over { .. } => {
                     panic!("Cannot use '}}' to close an over");
                 }
-                ParseScope::NewLocal { .. } => {
-                    panic!("Cannot use '}}' to close a new local");
+                ParseScope::Var { .. } => {
+                    panic!("Cannot use '}}' to close a var");
+                }
+                ParseScope::Get { .. } => {
+                    panic!("Cannot use '}}' to close a get");
                 }
                 ParseScope::ProcTypeParameterTypes { .. } => {
                     panic!("Cannot use '}}' to close a proc_type parameter type");

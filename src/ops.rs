@@ -18,7 +18,7 @@ pub enum Op {
     EnterScope,
     ExitScope,
     NewLocals(Vec<String>),
-    GetLocal(String),
+    GetLocals(Vec<String>),
     Load,
     Store,
     TypeOf,
@@ -133,22 +133,24 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
                     );
                 }
             }
-            Op::GetLocal(name) => {
-                let local = locals
-                    .iter()
-                    .rev()
-                    .flatten()
-                    .find_map(|(local_name, value)| {
-                        if local_name == name {
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    });
-                if let Some(local) = local {
-                    stack.push(Value::Reference(local.clone()));
-                } else {
-                    todo!()
+            Op::GetLocals(names) => {
+                for name in names {
+                    let local = locals
+                        .iter()
+                        .rev()
+                        .flatten()
+                        .find_map(|(local_name, value)| {
+                            if local_name == name {
+                                Some(value)
+                            } else {
+                                None
+                            }
+                        });
+                    if let Some(local) = local {
+                        stack.push(Value::Reference(local.clone()));
+                    } else {
+                        todo!()
+                    }
                 }
             }
             Op::Load => {
