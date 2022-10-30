@@ -94,6 +94,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 "store" => ops.push(Op::Store),
                 "call" => ops.push(Op::Call),
                 "return" => ops.push(Op::Return),
+                "swap" => ops.push(Op::Over(vec![1])),
                 "var" => {
                     if let Some(m) = WHITESPACE.find(source) {
                         source = &source[m.as_str().len()..];

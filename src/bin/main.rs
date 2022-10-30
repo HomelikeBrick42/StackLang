@@ -72,7 +72,7 @@ proc(int) -> (proc_type(int) -> (int)) {
     }
 }
 call
-35 over(1) call
+35 swap call
 get("print_int") load call
 
 "hello"
@@ -84,12 +84,11 @@ var("test")
 proc(int ref) -> () {
     dup load
     26 add
-    over(1)
+    swap
     store
 }
-get("test") over(1) call
-get("test") load
-get("print_int") load call
+get("test") swap call
+get("print_int" "test") load swap load call
 "#;
 
     let ops = compile_ops(source, &builtins);
