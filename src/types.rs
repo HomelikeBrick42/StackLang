@@ -51,11 +51,14 @@ impl std::fmt::Display for Type {
     }
 }
 
-pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Type>) {
+pub fn type_check<'a>(
+    ops: impl IntoIterator<Item = &'a Op>,
+    stack: &mut Vec<Type>,
+    locals: HashMap<String, Type>,
+) {
     let mut locals = vec![locals];
-    let mut ip = 0;
-    loop {
-        match &ops[ip] {
+    for op in ops {
+        match op {
             Op::DumpCurrentTypeStackInTypeChecking => {
                 println!("Current types on the stack:");
                 for typ in stack.iter().rev() {
@@ -105,7 +108,7 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                     _ => panic!("Expected procedure type but got type '{typ}'"),
                 };
                 let mut func_stack = arguments.clone();
-                type_check(ops, &mut func_stack, current_locals);
+                type_check(ops.iter(), &mut func_stack, current_locals);
                 assert_eq!(&func_stack, return_values); // TODO: error message
                 stack.push(typ.clone());
             }
@@ -131,7 +134,6 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                 }
                 stack.append(&mut return_values.clone());
             }
-            Op::Return => break,
             Op::Add => {
                 let b = stack
                     .pop()
@@ -305,7 +307,6 @@ pub fn type_check(ops: &[Op], stack: &mut Vec<Type>, locals: HashMap<String, Typ
                 stack.push(Type::Type);
             }
         }
-        ip += 1;
     }
     assert_eq!(locals.len(), 1);
 }

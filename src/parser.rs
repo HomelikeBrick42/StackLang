@@ -93,7 +93,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 "load" => ops.push(Op::Load),
                 "store" => ops.push(Op::Store),
                 "call" => ops.push(Op::Call),
-                "return" => ops.push(Op::Return),
                 "swap" => ops.push(Op::Over(vec![1])),
                 "var" => {
                     if let Some(m) = WHITESPACE.find(source) {
@@ -138,7 +137,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
             match parse_scopes.pop().unwrap() {
                 ParseScope::Over { old_ops } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let mut type_stack = vec![];
                     type_check(&ops, &mut type_stack, builtin_types.clone());
                     for typ in type_stack {
@@ -168,7 +166,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::Var { old_ops } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let mut type_stack = vec![];
                     type_check(&ops, &mut type_stack, builtin_types.clone());
                     for typ in type_stack {
@@ -198,7 +195,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::Get { old_ops } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let mut type_stack = vec![];
                     type_check(&ops, &mut type_stack, builtin_types.clone());
                     for typ in type_stack {
@@ -228,7 +224,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::ProcTypeParameterTypes { old_ops } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let mut type_stack = vec![];
                     type_check(&ops, &mut type_stack, builtin_types.clone());
                     for typ in type_stack {
@@ -260,7 +255,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     old_ops,
                 } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let mut type_stack = vec![];
                     type_check(&ops, &mut type_stack, builtin_types.clone());
                     for typ in type_stack {
@@ -287,7 +281,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::ProcParameterTypes { old_ops } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let mut type_stack = vec![];
                     type_check(&ops, &mut type_stack, builtin_types.clone());
                     for typ in type_stack {
@@ -319,7 +312,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     old_ops,
                 } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let mut type_stack = vec![];
                     type_check(&ops, &mut type_stack, builtin_types.clone());
                     for typ in type_stack {
@@ -382,7 +374,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     old_ops,
                 } => {
                     ops.push(Op::ExitScope);
-                    ops.push(Op::Return);
                     let new_ops = Rc::new(ops);
                     ops = old_ops;
                     ops.push(Op::MakeProcedure {
@@ -399,7 +390,6 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
         }
     }
     ops.push(Op::ExitScope);
-    ops.push(Op::Return);
     type_check(&ops, &mut vec![], builtin_types);
     ops
 }

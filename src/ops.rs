@@ -10,7 +10,6 @@ pub enum Op {
     Over(Vec<usize>), // 0 is the current top of the stack
     MakeProcedure { typ: Type, ops: Rc<Vec<Op>> },
     Call,
-    Return,
     Add,
     Subtract,
     Multiply,
@@ -29,11 +28,14 @@ pub enum Op {
     MakeReferenceType,
 }
 
-pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Cell<Value>>>) {
+pub fn execute<'a>(
+    ops: impl IntoIterator<Item = &'a Op>,
+    stack: &mut Vec<Value>,
+    locals: HashMap<String, Rc<Cell<Value>>>,
+) {
     let mut locals = vec![locals];
-    let mut ip = 0;
-    loop {
-        match &ops[ip] {
+    for op in ops {
+        match op {
             Op::DumpCurrentTypeStackInTypeChecking => {
                 unreachable!("This instruction should never make it into a final program");
             }
@@ -69,14 +71,13 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
             }
             Op::Call => match stack.pop().unwrap() {
                 Value::Function { ops, locals, .. } => {
-                    execute(&ops, stack, locals);
+                    execute(ops.iter(), stack, locals);
                 }
                 Value::BuiltinFunction(_, function) => {
                     function(stack);
                 }
                 _ => todo!(),
             },
-            Op::Return => break,
             Op::Add => {
                 let b = stack.pop().unwrap();
                 let a = stack.pop().unwrap();
@@ -209,6 +210,5 @@ pub fn execute(ops: &[Op], stack: &mut Vec<Value>, locals: HashMap<String, Rc<Ce
                 stack.push(Value::Type(Type::Reference(Box::new(typ))));
             }
         }
-        ip += 1;
     }
 }
