@@ -57,9 +57,11 @@ fn main() {
     let source = r#"
 5 42 6
 over(2 1)
-get("print_int") load call
-get("print_int") load call
-get("print_int") load call
+get("print_int") load
+dup over(2 2) call
+dup over(2 2) call
+dup over(2 2) call
+drop
 
 proc_type(int int) -> (int)
 get("print_type") load call
