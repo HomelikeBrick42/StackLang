@@ -70,6 +70,7 @@ pub fn type_check<'a>(
                 stack.push(value.get_type());
             }
             Op::Dup => {
+                assert!(stack.len() >= 1, "Expected at least 1 element to duplicate");
                 let value = stack.pop().unwrap();
                 stack.push(value.clone());
                 stack.push(value);
