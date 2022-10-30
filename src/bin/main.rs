@@ -54,46 +54,10 @@ fn main() {
         ),
     ]);
 
-    let source = r#"
-5 42 6
-over(2 1)
-get("print_int") load
-dup over(2 2) call
-dup over(2 2) call
-dup over(2 2) call
-drop
-
-proc_type(int int) -> (int)
-get("print_type") load call
-
-34
-proc(int) -> (proc_type(int) -> (int)) {
-    var("value")
-    proc(int) -> (int) {
-        get("value") load add
-    }
-}
-call
-35 swap call
-get("print_int") load call
-
-"hello"
-get("print_string") load call
-
-5
-var("test")
-
-proc(int ref) -> () {
-    dup load
-    26 add
-    swap
-    store
-}
-get("test") swap call
-get("print_int" "test") load swap load call
-"#;
-
-    let ops = compile_ops(source, &builtins);
+    let mut args = std::env::args().skip(1);
+    let filepath = args.next().expect("expected a filepath to read");
+    let source = std::fs::read_to_string(filepath).expect("Unable to read file");
+    let ops = compile_ops(&source, &builtins);
 
     execute(
         &ops,
