@@ -52,6 +52,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
         static ref IDENTIFIER: Regex = Regex::new(r"^[_A-Za-z][_0-9A-Za-z]*").unwrap();
         static ref STRING_LITERAL: Regex = Regex::new(r#"^"(.*?)""#).unwrap();
         static ref PROCEDURE_ARROW: Regex = Regex::new(r"^\s*->\s*\(").unwrap();
+        static ref DUMP_TYPES: Regex = Regex::new(r"^\?\?\?").unwrap();
     }
 
     let mut parse_scopes: Vec<ParseScope> = vec![];
@@ -60,6 +61,9 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
     while source.len() > 0 {
         if let Some(m) = WHITESPACE.find(source) {
             source = &source[m.as_str().len()..];
+        } else if let Some(m) = DUMP_TYPES.find(source) {
+            source = &source[m.as_str().len()..];
+            ops.push(Op::DumpCurrentTypeStackInTypeChecking);
         } else if let Some(m) = NUMBER.find(source) {
             let number = m.as_str();
             source = &source[number.len()..];
