@@ -26,6 +26,7 @@ pub enum Op {
     Equal,
     Not,
     MakeReferenceType,
+    If { then: Vec<Op>, r#else: Vec<Op> },
 }
 
 pub fn execute<'a>(
@@ -179,16 +180,18 @@ pub fn execute<'a>(
             Op::GreaterThan => {
                 let b = stack.pop().unwrap();
                 let a = stack.pop().unwrap();
-                match (a, b) {
+                stack.push(Value::Boolean(match (a, b) {
+                    (Value::Integer(a), Value::Integer(b)) => a > b,
                     (_, _) => todo!(),
-                }
+                }));
             }
             Op::LessThan => {
                 let b = stack.pop().unwrap();
                 let a = stack.pop().unwrap();
-                match (a, b) {
+                stack.push(Value::Boolean(match (a, b) {
+                    (Value::Integer(a), Value::Integer(b)) => a < b,
                     (_, _) => todo!(),
-                }
+                }));
             }
             Op::Equal => {
                 let b = stack.pop().unwrap();
@@ -208,6 +211,25 @@ pub fn execute<'a>(
                     _ => todo!(),
                 };
                 stack.push(Value::Type(Type::Reference(Box::new(typ))));
+            }
+            Op::If { then, r#else } => {
+                let condition = stack.pop().unwrap();
+                match condition {
+                    Value::Boolean(condition) => {
+                        let mut current_locals = HashMap::new();
+                        for (name, local) in locals.iter().rev().flatten() {
+                            if !current_locals.contains_key(name) {
+                                current_locals.insert(name.clone(), local.clone());
+                            }
+                        }
+                        if condition {
+                            execute(then, stack, current_locals);
+                        } else {
+                            execute(r#else, stack, current_locals);
+                        }
+                    }
+                    _ => todo!(),
+                }
             }
         }
     }

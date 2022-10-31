@@ -34,6 +34,14 @@ enum ParseScope {
         return_types: Vec<Type>,
         old_ops: Vec<Op>,
     },
+    IfCondition,
+    IfThen {
+        old_ops: Vec<Op>,
+    },
+    IfElse {
+        then_ops: Vec<Op>,
+        old_ops: Vec<Op>,
+    },
 }
 
 pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<Op> {
@@ -52,6 +60,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
         static ref IDENTIFIER: Regex = Regex::new(r"^[_A-Za-z][_0-9A-Za-z]*").unwrap();
         static ref STRING_LITERAL: Regex = Regex::new(r#"^"(.*?)""#).unwrap();
         static ref PROCEDURE_ARROW: Regex = Regex::new(r"^\s*->\s*\(").unwrap();
+        static ref ELSE: Regex = Regex::new(r"^\s*else\s*\{").unwrap();
         static ref DUMP_TYPES: Regex = Regex::new(r"^\?\?\?").unwrap();
     }
 
@@ -134,8 +143,21 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     parse_scopes.push(ParseScope::ProcParameterTypes { old_ops: ops });
                     ops = vec![Op::EnterScope];
                 }
+                "if" => {
+                    parse_scopes.push(ParseScope::IfCondition);
+                }
+                "greater" => ops.push(Op::GreaterThan),
+                "less" => ops.push(Op::LessThan),
                 _ => panic!("Unknown identifier '{identifier}'"),
             }
+        } else if let (true, Some(ParseScope::IfCondition)) = (
+            source.chars().next().unwrap() == '{' && parse_scopes.len() > 0,
+            parse_scopes.last(),
+        ) {
+            source = &source[1..];
+            parse_scopes.pop();
+            parse_scopes.push(ParseScope::IfThen { old_ops: ops });
+            ops = vec![Op::EnterScope];
         } else if source.chars().next().unwrap() == ')' && parse_scopes.len() > 0 {
             source = &source[1..];
             match parse_scopes.pop().unwrap() {
@@ -347,6 +369,13 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     ops = vec![Op::EnterScope];
                 }
                 ParseScope::ProcBody { .. } => panic!("Cannot use ')' to close a proc body"),
+                ParseScope::IfCondition => panic!("Cannot close if body before it is opened"),
+                ParseScope::IfThen { .. } => {
+                    panic!("Cannot use ')' to close the then scope of an if")
+                }
+                ParseScope::IfElse { .. } => {
+                    panic!("Cannot use ')' to close the else scope of an if")
+                }
             }
         } else if source.chars().next().unwrap() == '}' && parse_scopes.len() > 0 {
             source = &source[1..];
@@ -386,6 +415,34 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                             return_values: return_types,
                         },
                         ops: new_ops,
+                    });
+                }
+                ParseScope::IfThen { old_ops } => {
+                    if let Some(m) = ELSE.find(source) {
+                        source = &source[m.as_str().len()..];
+                        ops.push(Op::ExitScope);
+                        parse_scopes.push(ParseScope::IfElse {
+                            then_ops: ops,
+                            old_ops,
+                        });
+                        ops = vec![Op::EnterScope];
+                    } else {
+                        let then_ops = ops;
+                        ops = old_ops;
+                        ops.push(Op::If {
+                            then: then_ops,
+                            r#else: vec![],
+                        });
+                    }
+                }
+                ParseScope::IfCondition => panic!("Cannot close if body before it is opened"),
+                ParseScope::IfElse { then_ops, old_ops } => {
+                    ops.push(Op::ExitScope);
+                    let else_ops = ops;
+                    ops = old_ops;
+                    ops.push(Op::If {
+                        then: then_ops,
+                        r#else: else_ops,
                     });
                 }
             }

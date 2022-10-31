@@ -49,3 +49,10 @@ dup call get("print_int") load call
 dup call get("print_int") load call
 dup call get("print_int") load call
 drop
+
+if 5 10 less {
+    42
+} else {
+    45
+}
+get("print_int") load call

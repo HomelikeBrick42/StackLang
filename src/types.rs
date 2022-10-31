@@ -268,9 +268,10 @@ pub fn type_check<'a>(
                 let a = stack
                     .pop()
                     .expect("Expected second operand to greater than on the stack but got nothing");
-                match (a, b) {
-                    (_, _) => todo!(),
-                }
+                stack.push(match (a, b) {
+                    (Type::Integer, Type::Integer) => Type::Boolean,
+                    (a, b) => panic!("Cannot compare greater than on types '{a}' and '{b}'"),
+                });
             }
             Op::LessThan => {
                 let b = stack
@@ -279,9 +280,10 @@ pub fn type_check<'a>(
                 let a = stack
                     .pop()
                     .expect("Expected second operand to less than on the stack but got nothing");
-                match (a, b) {
-                    (_, _) => todo!(),
-                }
+                stack.push(match (a, b) {
+                    (Type::Integer, Type::Integer) => Type::Boolean,
+                    (a, b) => panic!("Cannot compare less than on types '{a}' and '{b}'"),
+                });
             }
             Op::Equal => {
                 let b = stack
@@ -306,6 +308,29 @@ pub fn type_check<'a>(
                     .expect("Expected a type to make a reference type from but got nothing");
                 assert_eq!(typ, Type::Type, "Expected a type but got '{typ}'");
                 stack.push(Type::Type);
+            }
+            Op::If { then, r#else } => {
+                let condition = stack
+                    .pop()
+                    .expect("Expected if condition on the stack but got nothing");
+                assert_eq!(
+                    condition,
+                    Type::Boolean,
+                    "Expected a boolean for if condition but got '{condition}'"
+                );
+                let mut current_locals = HashMap::new();
+                for (name, local) in locals.iter().rev().flatten() {
+                    if !current_locals.contains_key(name) {
+                        current_locals.insert(name.clone(), local.clone());
+                    }
+                }
+                let mut then_stack = stack.clone();
+                type_check(then, &mut then_stack, current_locals.clone());
+                type_check(r#else, stack, current_locals);
+                assert_eq!(
+                    &then_stack, stack,
+                    "Both paths through an if must result in the same types on the stack"
+                );
             }
         }
     }
