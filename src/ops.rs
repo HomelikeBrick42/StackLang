@@ -27,6 +27,7 @@ pub enum Op {
     Not,
     MakeReferenceType,
     If { then: Vec<Op>, r#else: Vec<Op> },
+    While { condition: Vec<Op>, body: Vec<Op> },
 }
 
 pub fn execute<'a>(
@@ -231,6 +232,25 @@ pub fn execute<'a>(
                     _ => todo!(),
                 }
             }
+            Op::While { condition, body } => loop {
+                let mut current_locals = HashMap::new();
+                for (name, local) in locals.iter().rev().flatten() {
+                    if !current_locals.contains_key(name) {
+                        current_locals.insert(name.clone(), local.clone());
+                    }
+                }
+                execute(condition, stack, current_locals.clone());
+                let condition = stack.pop().unwrap();
+                match condition {
+                    Value::Boolean(condition) => {
+                        if !condition {
+                            break;
+                        }
+                        execute(body, stack, current_locals);
+                    }
+                    _ => todo!(),
+                }
+            },
         }
     }
 }

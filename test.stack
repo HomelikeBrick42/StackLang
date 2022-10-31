@@ -50,9 +50,14 @@ dup call get("print_int") load call
 dup call get("print_int") load call
 drop
 
-if 5 10 less {
+if 5 10 greater {
     42
 } else {
     45
 }
 get("print_int") load call
+
+0 while dup 10 less {
+    dup get("print_int") load call
+    1 add
+}

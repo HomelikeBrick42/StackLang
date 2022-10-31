@@ -42,6 +42,13 @@ enum ParseScope {
         then_ops: Vec<Op>,
         old_ops: Vec<Op>,
     },
+    WhileCondition {
+        old_ops: Vec<Op>,
+    },
+    WhileBody {
+        condition_ops: Vec<Op>,
+        old_ops: Vec<Op>,
+    },
 }
 
 pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<Op> {
@@ -146,6 +153,10 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 "if" => {
                     parse_scopes.push(ParseScope::IfCondition);
                 }
+                "while" => {
+                    parse_scopes.push(ParseScope::WhileCondition { old_ops: ops });
+                    ops = vec![Op::EnterScope];
+                }
                 "greater" => ops.push(Op::GreaterThan),
                 "less" => ops.push(Op::LessThan),
                 _ => panic!("Unknown identifier '{identifier}'"),
@@ -157,6 +168,23 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
             source = &source[1..];
             parse_scopes.pop();
             parse_scopes.push(ParseScope::IfThen { old_ops: ops });
+            ops = vec![Op::EnterScope];
+        } else if let (true, Some(ParseScope::WhileCondition { .. })) = (
+            source.chars().next().unwrap() == '{' && parse_scopes.len() > 0,
+            parse_scopes.last(),
+        ) {
+            source = &source[1..];
+            ops.push(Op::ExitScope);
+            let old_ops =
+                if let ParseScope::WhileCondition { old_ops } = parse_scopes.pop().unwrap() {
+                    old_ops
+                } else {
+                    unreachable!()
+                };
+            parse_scopes.push(ParseScope::WhileBody {
+                condition_ops: ops,
+                old_ops,
+            });
             ops = vec![Op::EnterScope];
         } else if source.chars().next().unwrap() == ')' && parse_scopes.len() > 0 {
             source = &source[1..];
@@ -376,6 +404,12 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 ParseScope::IfElse { .. } => {
                     panic!("Cannot use ')' to close the else scope of an if")
                 }
+                ParseScope::WhileCondition { .. } => {
+                    panic!("Cannot close if body before it is opened")
+                }
+                ParseScope::WhileBody { .. } => {
+                    panic!("Cannot use ')' to close the while body of an if")
+                }
             }
         } else if source.chars().next().unwrap() == '}' && parse_scopes.len() > 0 {
             source = &source[1..];
@@ -443,6 +477,21 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     ops.push(Op::If {
                         then: then_ops,
                         r#else: else_ops,
+                    });
+                }
+                ParseScope::WhileCondition { .. } => {
+                    panic!("Cannot close while body before it is opened")
+                }
+                ParseScope::WhileBody {
+                    condition_ops,
+                    old_ops,
+                } => {
+                    ops.push(Op::ExitScope);
+                    let body_ops = ops;
+                    ops = old_ops;
+                    ops.push(Op::While {
+                        condition: condition_ops,
+                        body: body_ops,
                     });
                 }
             }

@@ -332,6 +332,33 @@ pub fn type_check<'a>(
                     "Both paths through an if must result in the same types on the stack"
                 );
             }
+            Op::While { condition, body } => {
+                let old_stack = stack.clone();
+                let mut current_locals = HashMap::new();
+                for (name, local) in locals.iter().rev().flatten() {
+                    if !current_locals.contains_key(name) {
+                        current_locals.insert(name.clone(), local.clone());
+                    }
+                }
+                type_check(condition, stack, current_locals.clone());
+                let condition = stack
+                    .pop()
+                    .expect("Expected while condition on the stack but got nothing");
+                assert_eq!(
+                    condition,
+                    Type::Boolean,
+                    "Expected a boolean for while condition but got '{condition}'"
+                );
+                assert_eq!(
+                    &old_stack, stack,
+                    "The number of elements after the while condition must be the same as before the while with an extra boolean on top"
+                );
+                type_check(body, stack, current_locals);
+                assert_eq!(
+                    &old_stack, stack,
+                    "The number of elements after the while body must be the same as before the while"
+                );
+            }
         }
     }
     assert_eq!(locals.len(), 1);
