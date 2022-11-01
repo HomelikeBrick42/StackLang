@@ -3,10 +3,12 @@ use std::{cell::Cell, collections::HashMap, rc::Rc};
 use stack_lang::*;
 
 fn main() {
-    let builtins = HashMap::from([
+    let builtins = HashMap::from([]);
+
+    let constants = HashMap::from([
         (
             "print_type".to_string(),
-            Value::BuiltinFunction(
+            vec![Value::BuiltinFunction(
                 Type::Procedure {
                     arguments: vec![Type::Type],
                     return_values: vec![],
@@ -18,11 +20,11 @@ fn main() {
                         _ => panic!("Expected a type"),
                     }
                 }),
-            ),
+            )],
         ),
         (
             "print_int".to_string(),
-            Value::BuiltinFunction(
+            vec![Value::BuiltinFunction(
                 Type::Procedure {
                     arguments: vec![Type::Integer],
                     return_values: vec![],
@@ -34,11 +36,11 @@ fn main() {
                         _ => panic!("Expected an int"),
                     }
                 }),
-            ),
+            )],
         ),
         (
             "print_string".to_string(),
-            Value::BuiltinFunction(
+            vec![Value::BuiltinFunction(
                 Type::Procedure {
                     arguments: vec![Type::String],
                     return_values: vec![],
@@ -50,14 +52,14 @@ fn main() {
                         _ => panic!("Expected a string"),
                     }
                 }),
-            ),
+            )],
         ),
     ]);
 
     let mut args = std::env::args().skip(1);
     let filepath = args.next().expect("expected a filepath to read");
     let source = std::fs::read_to_string(filepath).expect("Unable to read file");
-    let ops = compile_ops(&source, &builtins);
+    let ops = compile_ops(&source, &builtins, constants);
 
     execute(
         &ops,

@@ -1,13 +1,11 @@
 5 42 6
 over(2 1)
-get("print_int") load
-dup over(2 2) call
-dup over(2 2) call
-dup over(2 2) call
-drop
+print_int call
+print_int call
+print_int call
 
 proc_type(int int) -> (int)
-get("print_type") load call
+print_type call
 
 34
 proc(int) -> (proc_type(int) -> (int)) {
@@ -18,22 +16,22 @@ proc(int) -> (proc_type(int) -> (int)) {
 }
 call
 35 swap call
-get("print_int") load call
+print_int call
 
 "hello"
-get("print_string") load call
+print_string call
 
 5
 var("test")
 
-proc(int ref) -> () {
+const("add_26" proc(int ref) -> () {
     dup load
     26 add
     swap
     store
-}
-get("test") swap call
-get("print_int" "test") load swap load call
+})
+get("test") add_26 call
+get("test") load print_int call
 
 proc() -> (proc_type() -> (int)) {
     0 var("counter")
@@ -43,11 +41,11 @@ proc() -> (proc_type() -> (int)) {
         dup over(2) store
     }
 } call
-dup call get("print_int") load call
-dup call get("print_int") load call
-dup call get("print_int") load call
-dup call get("print_int") load call
-dup call get("print_int") load call
+dup call print_int call
+dup call print_int call
+dup call print_int call
+dup call print_int call
+dup call print_int call
 drop
 
 if 5 10 greater {
@@ -55,9 +53,9 @@ if 5 10 greater {
 } else {
     45
 }
-get("print_int") load call
+print_int call
 
 0 while dup 10 less {
-    dup get("print_int") load call
+    dup print_int call
     1 add
 }

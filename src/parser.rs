@@ -49,17 +49,24 @@ enum ParseScope {
         condition_ops: Vec<Op>,
         old_ops: Vec<Op>,
     },
+    Const {
+        old_ops: Vec<Op>,
+    },
 }
 
-pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<Op> {
-    let builtin_types: HashMap<_, _> = builtins
+pub fn compile_ops(
+    mut source: &str,
+    builtin_vars: &HashMap<String, Value>,
+    constants: HashMap<String, Vec<Value>>,
+) -> Vec<Op> {
+    let builtin_var_types = builtin_vars
         .iter()
         .map(|(name, value)| (name.clone(), value.get_type()))
-        .collect();
-    let builtin_values: HashMap<_, _> = builtins
+        .collect::<HashMap<_, _>>();
+    let builtin_var_values = builtin_vars
         .iter()
         .map(|(name, value)| (name.clone(), Rc::new(Cell::new(value.clone()))))
-        .collect();
+        .collect::<HashMap<_, _>>();
 
     lazy_static! {
         static ref WHITESPACE: Regex = Regex::new(r"^\s+").unwrap();
@@ -74,6 +81,8 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
     let mut parse_scopes: Vec<ParseScope> = vec![];
 
     let mut ops = vec![Op::EnterScope];
+    let mut constants = vec![constants];
+
     while source.len() > 0 {
         if let Some(m) = WHITESPACE.find(source) {
             source = &source[m.as_str().len()..];
@@ -105,6 +114,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     source = &source[1..];
                     parse_scopes.push(ParseScope::Over { old_ops: ops });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 "add" => ops.push(Op::Add),
                 "sub" => ops.push(Op::Subtract),
@@ -122,6 +132,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     source = &source[1..];
                     parse_scopes.push(ParseScope::Var { old_ops: ops });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 "get" => {
                     if let Some(m) = WHITESPACE.find(source) {
@@ -131,6 +142,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     source = &source[1..];
                     parse_scopes.push(ParseScope::Get { old_ops: ops });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 "proc_type" => {
                     if let Some(m) = WHITESPACE.find(source) {
@@ -140,6 +152,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     source = &source[1..];
                     parse_scopes.push(ParseScope::ProcTypeParameterTypes { old_ops: ops });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 "proc" => {
                     if let Some(m) = WHITESPACE.find(source) {
@@ -149,6 +162,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     source = &source[1..];
                     parse_scopes.push(ParseScope::ProcParameterTypes { old_ops: ops });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 "if" => {
                     parse_scopes.push(ParseScope::IfCondition);
@@ -156,10 +170,33 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 "while" => {
                     parse_scopes.push(ParseScope::WhileCondition { old_ops: ops });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 "greater" => ops.push(Op::GreaterThan),
                 "less" => ops.push(Op::LessThan),
-                _ => panic!("Unknown identifier '{identifier}'"),
+                "const" => {
+                    if let Some(m) = WHITESPACE.find(source) {
+                        source = &source[m.as_str().len()..];
+                    }
+                    assert_eq!(source.chars().next().unwrap(), '(');
+                    source = &source[1..];
+                    parse_scopes.push(ParseScope::Const { old_ops: ops });
+                    ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
+                }
+                _ => {
+                    if let Some(values) = constants
+                        .iter()
+                        .rev()
+                        .find_map(|scope| scope.get(identifier))
+                    {
+                        for value in values {
+                            ops.push(Op::Push(value.clone()));
+                        }
+                    } else {
+                        panic!("Unknown identifier '{identifier}'");
+                    }
+                }
             }
         } else if let (true, Some(ParseScope::IfCondition)) = (
             source.chars().next().unwrap() == '{' && parse_scopes.len() > 0,
@@ -169,12 +206,14 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
             parse_scopes.pop();
             parse_scopes.push(ParseScope::IfThen { old_ops: ops });
             ops = vec![Op::EnterScope];
+            constants.push(HashMap::new());
         } else if let (true, Some(ParseScope::WhileCondition { .. })) = (
             source.chars().next().unwrap() == '{' && parse_scopes.len() > 0,
             parse_scopes.last(),
         ) {
             source = &source[1..];
             ops.push(Op::ExitScope);
+            constants.pop();
             let old_ops =
                 if let ParseScope::WhileCondition { old_ops } = parse_scopes.pop().unwrap() {
                     old_ops
@@ -186,13 +225,15 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 old_ops,
             });
             ops = vec![Op::EnterScope];
+            constants.push(HashMap::new());
         } else if source.chars().next().unwrap() == ')' && parse_scopes.len() > 0 {
             source = &source[1..];
             match parse_scopes.pop().unwrap() {
                 ParseScope::Over { old_ops } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let mut type_stack = vec![];
-                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
                     for typ in type_stack {
                         assert_eq!(
                             typ,
@@ -201,7 +242,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         );
                     }
                     let mut values = vec![];
-                    execute(&ops, &mut values, builtin_values.clone());
+                    execute(&ops, &mut values, builtin_var_values.clone());
                     let offsets = values
                         .into_iter()
                         .map(|value| match value {
@@ -220,8 +261,9 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::Var { old_ops } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let mut type_stack = vec![];
-                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
                     for typ in type_stack {
                         assert_eq!(
                             typ,
@@ -230,7 +272,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         );
                     }
                     let mut values = vec![];
-                    execute(&ops, &mut values, builtin_values.clone());
+                    execute(&ops, &mut values, builtin_var_values.clone());
                     let names = values
                         .into_iter()
                         .map(|value| match value {
@@ -249,8 +291,9 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::Get { old_ops } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let mut type_stack = vec![];
-                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
                     for typ in type_stack {
                         assert_eq!(
                             typ,
@@ -259,7 +302,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         );
                     }
                     let mut values = vec![];
-                    execute(&ops, &mut values, builtin_values.clone());
+                    execute(&ops, &mut values, builtin_var_values.clone());
                     let names = values
                         .into_iter()
                         .map(|value| match value {
@@ -278,8 +321,9 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::ProcTypeParameterTypes { old_ops } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let mut type_stack = vec![];
-                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
                     for typ in type_stack {
                         assert_eq!(
                             typ,
@@ -288,7 +332,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         );
                     }
                     let mut values = vec![];
-                    execute(&ops, &mut values, builtin_values.clone());
+                    execute(&ops, &mut values, builtin_var_values.clone());
                     let parameter_types = values
                         .into_iter()
                         .map(|value| match value {
@@ -303,14 +347,16 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         old_ops,
                     });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 ParseScope::ProcTypeReturnTypes {
                     parameter_types,
                     old_ops,
                 } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let mut type_stack = vec![];
-                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
                     for typ in type_stack {
                         assert_eq!(
                             typ,
@@ -319,7 +365,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         );
                     }
                     let mut values = vec![];
-                    execute(&ops, &mut values, builtin_values.clone());
+                    execute(&ops, &mut values, builtin_var_values.clone());
                     let return_types = values
                         .into_iter()
                         .map(|value| match value {
@@ -335,8 +381,9 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 }
                 ParseScope::ProcParameterTypes { old_ops } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let mut type_stack = vec![];
-                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
                     for typ in type_stack {
                         assert_eq!(
                             typ,
@@ -345,7 +392,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         );
                     }
                     let mut values = vec![];
-                    execute(&ops, &mut values, builtin_values.clone());
+                    execute(&ops, &mut values, builtin_var_values.clone());
                     let parameter_types = values
                         .into_iter()
                         .map(|value| match value {
@@ -360,14 +407,16 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         old_ops,
                     });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 ParseScope::ProcReturnTypes {
                     parameter_types,
                     old_ops,
                 } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let mut type_stack = vec![];
-                    type_check(&ops, &mut type_stack, builtin_types.clone());
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
                     for typ in type_stack {
                         assert_eq!(
                             typ,
@@ -376,7 +425,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         );
                     }
                     let mut values = vec![];
-                    execute(&ops, &mut values, builtin_values.clone());
+                    execute(&ops, &mut values, builtin_var_values.clone());
                     let return_types = values
                         .into_iter()
                         .map(|value| match value {
@@ -395,6 +444,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         old_ops,
                     });
                     ops = vec![Op::EnterScope];
+                    constants.push(HashMap::new());
                 }
                 ParseScope::ProcBody { .. } => panic!("Cannot use ')' to close a proc body"),
                 ParseScope::IfCondition => panic!("Cannot close if body before it is opened"),
@@ -408,7 +458,44 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     panic!("Cannot close if body before it is opened")
                 }
                 ParseScope::WhileBody { .. } => {
-                    panic!("Cannot use ')' to close the while body of an if")
+                    panic!("Cannot use ')' to close a while body")
+                }
+                ParseScope::Const { old_ops } => {
+                    ops.push(Op::ExitScope);
+                    constants.pop();
+                    let mut type_stack = vec![];
+                    type_check(&ops, &mut type_stack, builtin_var_types.clone());
+                    assert!(
+                        type_stack.len() >= 1,
+                        "Expected at least 1 element on the type stack"
+                    );
+                    assert_eq!(
+                        type_stack[0],
+                        Type::String,
+                        "Expected the first element on the stack to be the const name but got '{}'",
+                        type_stack[0]
+                    );
+                    let mut values = vec![];
+                    execute(&ops, &mut values, builtin_var_values.clone());
+                    let name = match &values[0] {
+                        Value::String(value) => {
+                            assert!(
+                                IDENTIFIER.is_match(&value),
+                                "Expected a valid identifier but got {value:?}"
+                            );
+                            value
+                        }
+                        _ => unreachable!(),
+                    };
+                    let values = &values[1..];
+                    if let Some(_) = constants
+                        .last_mut()
+                        .unwrap()
+                        .insert(name.clone(), values.iter().cloned().collect())
+                    {
+                        panic!("Redeclaration of constant '{name}'");
+                    }
+                    ops = old_ops;
                 }
             }
         } else if source.chars().next().unwrap() == '}' && parse_scopes.len() > 0 {
@@ -441,6 +528,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     old_ops,
                 } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let new_ops = Rc::new(ops);
                     ops = old_ops;
                     ops.push(Op::MakeProcedure {
@@ -452,14 +540,16 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     });
                 }
                 ParseScope::IfThen { old_ops } => {
+                    ops.push(Op::ExitScope);
+                    constants.pop();
                     if let Some(m) = ELSE.find(source) {
                         source = &source[m.as_str().len()..];
-                        ops.push(Op::ExitScope);
                         parse_scopes.push(ParseScope::IfElse {
                             then_ops: ops,
                             old_ops,
                         });
                         ops = vec![Op::EnterScope];
+                        constants.push(HashMap::new());
                     } else {
                         let then_ops = ops;
                         ops = old_ops;
@@ -472,6 +562,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                 ParseScope::IfCondition => panic!("Cannot close if body before it is opened"),
                 ParseScope::IfElse { then_ops, old_ops } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let else_ops = ops;
                     ops = old_ops;
                     ops.push(Op::If {
@@ -487,6 +578,7 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                     old_ops,
                 } => {
                     ops.push(Op::ExitScope);
+                    constants.pop();
                     let body_ops = ops;
                     ops = old_ops;
                     ops.push(Op::While {
@@ -494,12 +586,17 @@ pub fn compile_ops(mut source: &str, builtins: &HashMap<String, Value>) -> Vec<O
                         body: body_ops,
                     });
                 }
+                ParseScope::Const { .. } => {
+                    panic!("Cannot use '}}' to close a const");
+                }
             }
         } else {
             panic!("Unexpected character {:?}", source.chars().next().unwrap());
         }
     }
     ops.push(Op::ExitScope);
-    type_check(&ops, &mut vec![], builtin_types);
+    constants.pop();
+    assert_eq!(constants.len(), 0);
+    type_check(&ops, &mut vec![], builtin_var_types);
     ops
 }
