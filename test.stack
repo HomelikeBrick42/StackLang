@@ -4,7 +4,9 @@ print_int call
 print_int call
 print_int call
 
-proc_type(int int) -> (int)
+const("int_pair" int int)
+
+proc_type(int_pair) -> (int)
 print_type call
 
 34
