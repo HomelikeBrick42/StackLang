@@ -359,6 +359,14 @@ pub fn type_check<'a>(
                     "The number of elements after the while body must be the same as before the while"
                 );
             }
+            Op::Concat => {
+                let b = stack.pop().unwrap();
+                let a = stack.pop().unwrap();
+                stack.push(match (a, b) {
+                    (Type::String, Type::String) => Type::String,
+                    (a, b) => panic!("Cannot concat types '{a}' and '{b}'"),
+                });
+            }
         }
     }
     assert_eq!(locals.len(), 1);

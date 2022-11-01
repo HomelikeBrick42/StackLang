@@ -28,6 +28,7 @@ pub enum Op {
     MakeReferenceType,
     If { then: Vec<Op>, r#else: Vec<Op> },
     While { condition: Vec<Op>, body: Vec<Op> },
+    Concat,
 }
 
 pub fn execute<'a>(
@@ -251,6 +252,17 @@ pub fn execute<'a>(
                     _ => todo!(),
                 }
             },
+            Op::Concat => {
+                let b = match stack.pop().unwrap() {
+                    Value::String(value) => value,
+                    _ => todo!(),
+                };
+                let a = match stack.pop().unwrap() {
+                    Value::String(value) => value,
+                    _ => todo!(),
+                };
+                stack.push(Value::String(a + &b));
+            }
         }
     }
 }

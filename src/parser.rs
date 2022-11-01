@@ -184,6 +184,7 @@ pub fn compile_ops(
                     ops = vec![Op::EnterScope];
                     constants.push(HashMap::new());
                 }
+                "concat" => ops.push(Op::Concat),
                 _ => {
                     if let Some(values) = constants
                         .iter()

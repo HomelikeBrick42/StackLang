@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashMap, rc::Rc};
+use std::{cell::Cell, collections::HashMap, io::Write, rc::Rc};
 
 use stack_lang::*;
 
@@ -6,6 +6,16 @@ fn main() {
     let builtins = HashMap::from([]);
 
     let constants = HashMap::from([
+        (
+            "println".to_string(),
+            vec![Value::BuiltinFunction(
+                Type::Procedure {
+                    arguments: vec![],
+                    return_values: vec![],
+                },
+                Rc::new(|_| println!()),
+            )],
+        ),
         (
             "print_type".to_string(),
             vec![Value::BuiltinFunction(
@@ -48,9 +58,26 @@ fn main() {
                 Rc::new(|stack| {
                     let value = stack.pop().unwrap();
                     match value {
-                        Value::String(str) => println!("{str}"),
+                        Value::String(str) => {
+                            print!("{str}");
+                            std::io::stdout().flush().unwrap();
+                        }
                         _ => panic!("Expected a string"),
                     }
+                }),
+            )],
+        ),
+        (
+            "read_line".to_string(),
+            vec![Value::BuiltinFunction(
+                Type::Procedure {
+                    arguments: vec![],
+                    return_values: vec![Type::String],
+                },
+                Rc::new(|stack| {
+                    stack.push(Value::String(
+                        std::io::stdin().lines().next().unwrap().unwrap(),
+                    ));
                 }),
             )],
         ),

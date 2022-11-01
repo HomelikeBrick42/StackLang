@@ -23,17 +23,16 @@ print_int call
 "hello"
 print_string call
 
-5
-var("test")
-
 const("add_26" proc(int ref) -> () {
     dup load
     26 add
     swap
     store
 })
-get("test") add_26 call
-get("test") load print_int call
+
+5 var("test")
+get("test") dup add_26 call
+load print_int call
 
 proc() -> (proc_type() -> (int)) {
     0 var("counter")
@@ -61,3 +60,7 @@ print_int call
     dup print_int call
     1 add
 }
+
+"What is your name? " print_string call
+"Hello, " read_line call concat
+print_string call println call
