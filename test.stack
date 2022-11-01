@@ -61,6 +61,19 @@ print_int call
     1 add
 }
 
+const("factorial" proc(int) -> (int) {
+    var("n")
+    1
+    var("counter")
+    1
+    while get("counter" "n") load swap load 1 sub greater {
+        get("counter") load mul
+        get("counter") dup load 1 add swap store
+    }
+})
+
+6 factorial call print_int call
+
 "What is your name? " print_string call
 "Hello, " read_line call concat
 print_string call println call
