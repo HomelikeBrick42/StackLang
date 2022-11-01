@@ -185,6 +185,7 @@ pub fn compile_ops(
                     constants.push(HashMap::new());
                 }
                 "concat" => ops.push(Op::Concat),
+                "assert" => ops.push(Op::Assert),
                 _ => {
                     if let Some(values) = constants
                         .iter()

@@ -29,6 +29,7 @@ pub enum Op {
     If { then: Vec<Op>, r#else: Vec<Op> },
     While { condition: Vec<Op>, body: Vec<Op> },
     Concat,
+    Assert,
 }
 
 pub fn execute<'a>(
@@ -262,6 +263,13 @@ pub fn execute<'a>(
                     _ => todo!(),
                 };
                 stack.push(Value::String(a + &b));
+            }
+            Op::Assert => {
+                let condition = match stack.pop().unwrap() {
+                    Value::Boolean(value) => value,
+                    _ => todo!(),
+                };
+                assert!(condition);
             }
         }
     }

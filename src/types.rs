@@ -367,6 +367,16 @@ pub fn type_check<'a>(
                     (a, b) => panic!("Cannot concat types '{a}' and '{b}'"),
                 });
             }
+            Op::Assert => {
+                let condition = stack
+                    .pop()
+                    .expect("Expected assert condition on the stack but got nothing");
+                assert_eq!(
+                    condition,
+                    Type::Boolean,
+                    "Expected a boolean for the assert condition but got '{condition}'"
+                );
+            }
         }
     }
     assert_eq!(locals.len(), 1);
