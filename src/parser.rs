@@ -72,6 +72,7 @@ pub fn compile_ops(
         static ref WHITESPACE: Regex = Regex::new(r"^\s+").unwrap();
         static ref NUMBER: Regex = Regex::new(r"^[0-9]+").unwrap();
         static ref IDENTIFIER: Regex = Regex::new(r"^[_A-Za-z][_0-9A-Za-z]*").unwrap();
+        static ref LABEL: Regex = Regex::new(r"^:([_A-Za-z][_0-9A-Za-z]*)").unwrap();
         static ref STRING_LITERAL: Regex = Regex::new(r#"^"(.*?)""#).unwrap();
         static ref PROCEDURE_ARROW: Regex = Regex::new(r"^\s*->\s*\(").unwrap();
         static ref ELSE: Regex = Regex::new(r"^\s*else\s*\{").unwrap();
@@ -98,6 +99,11 @@ pub fn compile_ops(
             source = &source[str.len()..];
             let captures = STRING_LITERAL.captures(str).unwrap();
             ops.push(Op::Push(Value::String(captures[1].into())));
+        } else if let Some(m) = LABEL.find(source) {
+            let str = m.as_str();
+            source = &source[str.len()..];
+            let captures = LABEL.captures(str).unwrap();
+            ops.push(Op::Push(Value::Label(captures[1].into())));
         } else if let Some(m) = IDENTIFIER.find(source) {
             let identifier = m.as_str();
             source = &source[identifier.len()..];
@@ -269,8 +275,8 @@ pub fn compile_ops(
                     for typ in type_stack {
                         assert_eq!(
                             typ,
-                            Type::String,
-                            "All elements left on the var name stack must be strings"
+                            Type::Label,
+                            "All elements left on the var name stack must be labels"
                         );
                     }
                     let mut values = vec![];
@@ -278,13 +284,7 @@ pub fn compile_ops(
                     let names = values
                         .into_iter()
                         .map(|value| match value {
-                            Value::String(value) => {
-                                assert!(
-                                    IDENTIFIER.is_match(&value),
-                                    "Expected a valid identifier but got {value:?}"
-                                );
-                                value
-                            }
+                            Value::Label(value) => value,
                             _ => unreachable!(),
                         })
                         .collect();
@@ -299,8 +299,8 @@ pub fn compile_ops(
                     for typ in type_stack {
                         assert_eq!(
                             typ,
-                            Type::String,
-                            "All elements left on the get name stack must be strings"
+                            Type::Label,
+                            "All elements left on the get name stack must be labels"
                         );
                     }
                     let mut values = vec![];
@@ -308,13 +308,7 @@ pub fn compile_ops(
                     let names = values
                         .into_iter()
                         .map(|value| match value {
-                            Value::String(value) => {
-                                assert!(
-                                    IDENTIFIER.is_match(&value),
-                                    "Expected a valid identifier but got {value:?}"
-                                );
-                                value
-                            }
+                            Value::Label(value) => value,
                             _ => unreachable!(),
                         })
                         .collect();
@@ -473,20 +467,14 @@ pub fn compile_ops(
                     );
                     assert_eq!(
                         type_stack[0],
-                        Type::String,
+                        Type::Label,
                         "Expected the first element on the stack to be the const name but got '{}'",
                         type_stack[0]
                     );
                     let mut values = vec![];
                     execute(&ops, &mut values, builtin_var_values.clone());
                     let name = match &values[0] {
-                        Value::String(value) => {
-                            assert!(
-                                IDENTIFIER.is_match(&value),
-                                "Expected a valid identifier but got {value:?}"
-                            );
-                            value
-                        }
+                        Value::Label(value) => value,
                         _ => unreachable!(),
                     };
                     let values = &values[1..];
