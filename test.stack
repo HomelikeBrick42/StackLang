@@ -62,7 +62,9 @@ print_int call
 }
 
 const("factorial" proc(int) -> (int) {
-    dup 0 1 sub greater assert
+    dup
+    0 1 sub "this is because there is no negative literals like -1" drop
+    greater assert
 
     var("n")
     1
@@ -74,6 +76,7 @@ const("factorial" proc(int) -> (int) {
     }
 })
 
+"6! = " print_string call
 6 factorial call print_int call
 
 "What is your name? " print_string call
